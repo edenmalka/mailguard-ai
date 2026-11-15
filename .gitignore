@@ -1,0 +1,37 @@
+# --- Secrets: never commit these ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*credentials*.json
+*service-account*.json
+.clasprc.json
+
+# --- Real email samples: may contain private data ---
+# Only synthetic fixtures belong in the repo (backend/tests/fixtures/).
+samples/private/
+
+# --- Assignment brief: kept private, not published with the repo ---
+docs/assignment.txt
+docs/*.pdf
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# --- Editors / OS ---
+.DS_Store
+.vscode/
+.idea/
+
+# --- Local Claude Code settings ---
+.claude/settings.local.json
