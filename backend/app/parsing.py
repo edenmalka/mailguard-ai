@@ -20,7 +20,7 @@ from email.parser import BytesParser
 from app.analyzers.domains import normalize_domain
 
 MAX_PARTS = 200
-MAX_TEXT_CHARS = 200_000
+MAX_TEXT_CHARS = 1_000_000  # per body type; raw messages are capped at 2 MB anyway
 MAX_HEADER_CHARS = 10_000
 # Python's address parser slows down sharply on huge address lists (seconds for tens of
 # thousands of addresses), which an attacker could use to make analysis time out. Real
@@ -58,6 +58,7 @@ class ParsedEmail:
     text_body: str = ""
     html_body: str = ""
     attachments: list[Attachment] = field(default_factory=list)
+    body_truncated: bool = False  # True if text/HTML beyond MAX_TEXT_CHARS was not kept
     defects: list[str] = field(default_factory=list)
 
     @property
@@ -194,8 +195,11 @@ def _read_parts(message: EmailMessage, parsed: ParsedEmail) -> None:
     except RecursionError:
         parsed.defects.append("NestingTooDeep")
 
-    parsed.text_body = "".join(text_parts)[:MAX_TEXT_CHARS]
-    parsed.html_body = "".join(html_parts)[:MAX_TEXT_CHARS]
+    text_body = "".join(text_parts)
+    html_body = "".join(html_parts)
+    parsed.body_truncated = len(text_body) > MAX_TEXT_CHARS or len(html_body) > MAX_TEXT_CHARS
+    parsed.text_body = text_body[:MAX_TEXT_CHARS]
+    parsed.html_body = html_body[:MAX_TEXT_CHARS]
 
 
 def _read_leaf_part(
@@ -234,7 +238,7 @@ def _decode_text(part: Message, parsed: ParsedEmail) -> str:
     try:
         content = part.get_content()
         if isinstance(content, str):
-            return content[:MAX_TEXT_CHARS]
+            return content
     except Exception:
         parsed.defects.append("UndecodableTextPart")
-    return _payload_bytes(part, parsed).decode("utf-8", errors="replace")[:MAX_TEXT_CHARS]
+    return _payload_bytes(part, parsed).decode("utf-8", errors="replace")

@@ -26,7 +26,9 @@ BRANDS: tuple[Brand, ...] = (
         {"microsoft.com", "outlook.com", "live.com", "office.com", "microsoftonline.com"},
     ),
     _brand("Apple", {"apple", "icloud"}, {"apple.com", "icloud.com"}),
-    _brand("Google", {"google", "gmail"}, {"google.com", "gmail.com", "youtube.com"}),
+    _brand(
+        "Google", {"google", "gmail"}, {"google.com", "gmail.com", "googlemail.com", "youtube.com"}
+    ),
     _brand("Amazon", {"amazon"}, {"amazon.com", "amazon.co.uk", "amazon.de"}),
     _brand("Netflix", {"netflix"}, {"netflix.com"}),
     _brand("DHL", {"dhl"}, {"dhl.com", "dhl.de"}),

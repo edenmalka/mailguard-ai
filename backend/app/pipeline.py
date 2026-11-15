@@ -4,10 +4,12 @@ Scoring here is deliberately simple and provisional (sum of points, capped at 10
 Step 7 replaces it with weighted scoring, combination rules and attack-pattern labels.
 
 A low score only means "low risk" when the message was fully analyzed. If the message is
-malformed or has no usable sender, the verdict is "inconclusive" instead of "safe".
+malformed, has no usable sender, or was too large to check completely, the verdict is
+"inconclusive" instead of "safe".
 """
 
 from app.analyzers.authentication import analyze_authentication
+from app.analyzers.links import analyze_links
 from app.analyzers.sender import analyze_sender
 from app.analyzers.structure import analyze_structure
 from app.parsing import ParsedEmail, parse_email
@@ -24,16 +26,27 @@ LIMIT_NO_AUTH = (
     "Sender authentication results (SPF, DKIM, DMARC) from Gmail were not available, so the "
     "sender's identity could not be confirmed."
 )
+LIMIT_PARTIAL_CONTENT = (
+    "The email is very large, so only its first part and first links were checked; links "
+    "further down were not analyzed."
+)
 
 
 def analyze_email(raw: bytes, trusted_authserv_ids: frozenset[str]) -> AnalyzeResponse:
     parsed = parse_email(raw)
     auth = analyze_authentication(parsed, trusted_authserv_ids)
-    signals = [*auth.signals, *analyze_sender(parsed), *analyze_structure(parsed)]
+    links = analyze_links(parsed)
+    signals = [
+        *auth.signals,
+        *analyze_sender(parsed),
+        *links.signals,
+        *analyze_structure(parsed),
+    ]
     signals.sort(key=lambda s: s.points, reverse=True)
 
-    limitations = _limitations(parsed, auth.summary.source)
-    fully_analyzed = parsed.sender is not None and not parsed.defects
+    partial_content = parsed.body_truncated or links.truncated
+    limitations = _limitations(parsed, auth.summary.source, partial_content)
+    fully_analyzed = parsed.sender is not None and not parsed.defects and not partial_content
 
     score = min(100, sum(s.points for s in signals))
     verdict = _verdict(score, fully_analyzed)
@@ -47,7 +60,7 @@ def analyze_email(raw: bytes, trusted_authserv_ids: frozenset[str]) -> AnalyzeRe
     )
 
 
-def _limitations(parsed: ParsedEmail, auth_source: AuthSource) -> list[str]:
+def _limitations(parsed: ParsedEmail, auth_source: AuthSource, partial_content: bool) -> list[str]:
     limitations = []
     if parsed.sender is None:
         limitations.append(LIMIT_NO_SENDER)
@@ -55,6 +68,8 @@ def _limitations(parsed: ParsedEmail, auth_source: AuthSource) -> list[str]:
         limitations.append(LIMIT_MALFORMED)
     if auth_source is AuthSource.UNAVAILABLE:
         limitations.append(LIMIT_NO_AUTH)
+    if partial_content:
+        limitations.append(LIMIT_PARTIAL_CONTENT)
     return limitations
 
 
@@ -78,5 +93,5 @@ def _summary(verdict: Verdict, signals: list[Signal], limitations: list[str]) ->
             return f"Low risk. Minor finding: {risky[0].title}."
         if limitations:
             return "No risk signals found, but some checks could not be completed."
-        return "No risk signals found in the sender and authentication checks."
+        return "No risk signals found in the sender, authentication and link checks."
     return f"{len(risky)} risk signal(s) found. Most serious: {risky[0].title}."

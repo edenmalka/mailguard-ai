@@ -6,6 +6,7 @@ so the backend never makes network calls while analyzing an email.
 
 from __future__ import annotations
 
+import ipaddress
 import unicodedata
 from dataclasses import dataclass
 
@@ -42,18 +43,40 @@ def normalize_domain(domain: str) -> str:
 def registrable_domain(domain: str) -> str:
     """The part of a domain an organization registers, e.g. mail.paypal.com -> paypal.com.
 
-    Falls back to the full domain when there is no known public suffix (e.g. ".test").
+    For unknown endings (e.g. ".test", internal names) the last two labels are used, so
+    a.corp.test and b.corp.test still count as one organization. IP addresses are kept whole.
     """
     if not domain:
         return ""
-    return _extractor(domain).top_domain_under_public_suffix or domain
+    registered = _extractor(domain).top_domain_under_public_suffix
+    if registered:
+        return registered
+    if _is_ip_address(domain):
+        return domain
+    return ".".join(domain.split(".")[-2:])
+
+
+def _is_ip_address(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return True
 
 
 def registrable_label(domain: str) -> str:
     """The name part of the registrable domain, e.g. mail.paypal.co.uk -> paypal."""
-    if not domain:
-        return ""
-    return _extractor(domain).domain or domain
+    registered = registrable_domain(domain)
+    if not registered or _is_ip_address(registered):
+        return registered
+    suffix = _extractor(domain).suffix
+    name = registered[: -len(suffix) - 1] if suffix and registered.endswith("." + suffix) else ""
+    return name or registered.split(".")[0]
+
+
+def has_public_suffix(domain: str) -> bool:
+    """True if the domain ends in a known public suffix (e.g. .com, .co.uk)."""
+    return bool(domain) and bool(_extractor(domain).suffix)
 
 
 def same_organization(domain_a: str, domain_b: str) -> bool:
@@ -105,6 +128,11 @@ def find_lookalike(domain: str) -> Lookalike | None:
         return None
 
     label = registrable_label(domain)
+    registered = registrable_domain(domain)
+    # Labels in front of the registrable domain, e.g. "paypal" in paypal.account-verify.example.
+    prefix = domain[: -len(registered)].rstrip(".") if domain.endswith("." + registered) else ""
+    prefix_parts = {skeleton(p) for lbl in prefix.split(".") if lbl for p in lbl.split("-")}
+
     for brand in BRANDS:
         for official in sorted(brand.domains):
             official_label = registrable_label(official)
@@ -112,6 +140,12 @@ def find_lookalike(domain: str) -> Lookalike | None:
             # paypal.com.account-verify.net, mail.dhl.com.track.test: a brand domain used as
             # subdomain labels of an unrelated domain, so the start of the name looks official.
             if f".{official}." in f".{domain}":
+                return Lookalike(brand, official, "subdomain")
+            # paypal.account-verify.example, paypal.com-login.example: brand name as a
+            # subdomain label in front of an unrelated registrable domain.
+            if official_label not in _DICTIONARY_LABELS and skeleton(official_label) in (
+                prefix_parts
+            ):
                 return Lookalike(brand, official, "subdomain")
 
             # paypa1.com, rnicrosoft.com: different characters that look the same.
@@ -129,9 +163,11 @@ def find_lookalike(domain: str) -> Lookalike | None:
             ):
                 return Lookalike(brand, official, "typo")
 
-            # paypal-secure.com, paypalsupport.com: brand name plus a generic word.
+            # paypal-secure.com, paypa1-login.top, paypalsupport.com: brand name (possibly with
+            # look-alike characters) plus other words.
+            official_skeleton = skeleton(official_label)
             parts = label.split("-")
-            if len(parts) > 1 and official_label in parts:
+            if len(parts) > 1 and official_skeleton in {skeleton(p) for p in parts}:
                 return Lookalike(brand, official, "combo")
             if label.startswith(official_label) and label[len(official_label) :] in GENERIC_WORDS:
                 return Lookalike(brand, official, "combo")

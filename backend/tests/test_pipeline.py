@@ -4,7 +4,15 @@ import time
 
 import pytest
 
-from app.pipeline import LIMIT_MALFORMED, LIMIT_NO_AUTH, LIMIT_NO_SENDER, analyze_email
+from app.analyzers.urls import MAX_LINKS
+from app.parsing import MAX_TEXT_CHARS
+from app.pipeline import (
+    LIMIT_MALFORMED,
+    LIMIT_NO_AUTH,
+    LIMIT_NO_SENDER,
+    LIMIT_PARTIAL_CONTENT,
+    analyze_email,
+)
 from tests.conftest import encode_message
 from tests.helpers import GMAIL, load_fixture
 
@@ -137,6 +145,8 @@ def test_signals_are_sorted_most_serious_first() -> None:
         "untrusted_auth_only.eml",
         "encoded_headers.eml",
         "malformed.eml",
+        "phish_link_tricks.eml",
+        "newsletter_tracking_links.eml",
     ],
 )
 def test_every_fixture_works_through_the_signed_api(post_signed, fixture: str) -> None:
@@ -146,3 +156,57 @@ def test_every_fixture_works_through_the_signed_api(post_signed, fixture: str) -
     assert 0 <= body["score"] <= 100
     assert body["authentication"]["source"] in {"reported", "unavailable"}
     assert all(s["category"] for s in body["signals"])
+
+
+# --- Links (Step 5) ------------------------------------------------------------------------
+
+
+def _html_message(html: str) -> bytes:
+    return (
+        "Authentication-Results: mx.google.com; spf=pass; dkim=pass; dmarc=pass\r\n"
+        "From: a@example.com\r\nMIME-Version: 1.0\r\n"
+        f"Content-Type: text/html; charset=utf-8\r\n\r\n{html}"
+    ).encode()
+
+
+def test_link_phishing_fixture_is_malicious_despite_passing_authentication() -> None:
+    result = analyze_email(load_fixture("phish_link_tricks.eml"), GMAIL)
+    assert result.verdict == "malicious"
+    assert result.authentication is not None and result.authentication.dmarc == "pass"
+    assert any(s.category == "links" for s in result.signals)
+
+
+def test_newsletter_with_tracking_links_is_low_risk() -> None:
+    result = analyze_email(load_fixture("newsletter_tracking_links.eml"), GMAIL)
+    assert result.verdict == "safe"
+    assert result.score == 0
+    assert result.limitations == []
+
+
+def test_too_many_links_is_inconclusive_not_safe() -> None:
+    # An attacker could hide one bad link after hundreds of harmless ones.
+    html = "".join(f'<a href="https://example.com/{i}">x</a>' for i in range(MAX_LINKS + 10))
+    result = analyze_email(_html_message(html), GMAIL)
+    assert result.verdict == "inconclusive"
+    assert LIMIT_PARTIAL_CONTENT in result.limitations
+
+
+def test_oversized_body_is_inconclusive_not_safe() -> None:
+    result = analyze_email(_html_message("<p>" + "a" * (MAX_TEXT_CHARS + 10) + "</p>"), GMAIL)
+    assert result.verdict == "inconclusive"
+    assert LIMIT_PARTIAL_CONTENT in result.limitations
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        "<" * 1_900_000,
+        "<a href='x" * 190_000,
+        "".join(f'<a href="https://h{i}.example/">www.h{i}.example</a>' for i in range(40_000)),
+        "&#x41;" * 300_000,
+    ],
+)
+def test_worst_case_html_is_analyzed_quickly(html: str) -> None:
+    start = time.perf_counter()
+    analyze_email(_html_message(html), GMAIL)
+    assert time.perf_counter() - start < 5

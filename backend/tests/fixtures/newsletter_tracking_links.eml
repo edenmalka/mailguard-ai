@@ -1,0 +1,27 @@
+Return-Path: <bounces@mail.example.com>
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@example.com header.s=s1;
+       spf=pass smtp.mailfrom=bounces@mail.example.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=example.com
+From: Example Store <news@example.com>
+To: reader@example.org
+Subject: New arrivals this week
+Date: Sat, 14 Nov 2026 18:10:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="b3"
+
+--b3
+Content-Type: text/plain; charset=utf-8
+
+See new arrivals at https://www.example.com/new. Questions? Reply to this email.
+--b3
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p><a href="https://u1234.ct.sendgrid.net/ls/click?upn=abc">www.example.com/new</a></p>
+<p><a href="https://shop.example.com/sale">https://www.example.com/sale</a></p>
+<p><a href="https://www.example.com/account">Your account</a> &middot; <a href="mailto:help@example.com">help@example.com</a></p>
+<p><a href="https://www.example.com/unsubscribe?id=42">Unsubscribe</a></p>
+<img src="https://img.example.com/logo.png" alt="logo">
+</body></html>
+--b3--
