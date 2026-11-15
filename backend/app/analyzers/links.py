@@ -7,7 +7,7 @@ so many links of the same kind do not inflate the score. Examples are "defanged"
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from urllib.parse import parse_qsl
 
@@ -56,8 +56,9 @@ class LinkAnalysis:
     truncated: bool  # not every link could be checked
 
 
-def analyze_links(parsed: ParsedEmail) -> LinkAnalysis:
-    extraction = extract_links(parsed)
+def analyze_links(parsed: ParsedEmail, extra_urls: Sequence[str] = ()) -> LinkAnalysis:
+    """Check links in the email body and `extra_urls` (URLs found inside attachments)."""
+    extraction = extract_links(parsed, extra_urls)
     findings: dict[str, list[str]] = {}
     lookalikes: list[Lookalike] = []
 
@@ -116,6 +117,8 @@ def _check_web_link(
     via: str | None = None,
 ) -> None:
     shown = defang(link.url) + (f" (hidden inside a link to {defang(via)})" if via else "")
+    if link.source == "attachment":
+        shown += " (found inside an attachment)"
     host = link.host
     registered = registrable_domain(host)
 

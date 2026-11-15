@@ -4,11 +4,13 @@ Scoring here is deliberately simple and provisional (sum of points, capped at 10
 Step 7 replaces it with weighted scoring, combination rules and attack-pattern labels.
 
 A low score only means "low risk" when the message was fully analyzed. If the message is
-malformed, has no usable sender, or was too large to check completely, the verdict is
-"inconclusive" instead of "safe".
+malformed, has no usable sender, was too large to check completely, or has attachments that
+could not be inspected, the verdict is "inconclusive" instead of "safe".
 """
 
+from app.analyzers.attachments import analyze_attachments
 from app.analyzers.authentication import analyze_authentication
+from app.analyzers.content import analyze_content
 from app.analyzers.links import analyze_links
 from app.analyzers.sender import analyze_sender
 from app.analyzers.structure import analyze_structure
@@ -30,23 +32,37 @@ LIMIT_PARTIAL_CONTENT = (
     "The email is very large, so only its first part and first links were checked; links "
     "further down were not analyzed."
 )
+LIMIT_UNINSPECTED_ATTACHMENTS = (
+    "Some attachments could not be inspected (for example password-protected or RAR/7z "
+    "archives), so their contents were not checked: "
+)
 
 
 def analyze_email(raw: bytes, trusted_authserv_ids: frozenset[str]) -> AnalyzeResponse:
     parsed = parse_email(raw)
     auth = analyze_authentication(parsed, trusted_authserv_ids)
-    links = analyze_links(parsed)
+    attachments = analyze_attachments(parsed)
+    links = analyze_links(parsed, extra_urls=attachments.urls)  # incl. URLs inside files
     signals = [
         *auth.signals,
         *analyze_sender(parsed),
         *links.signals,
+        *attachments.signals,
+        *analyze_content(parsed),
         *analyze_structure(parsed),
     ]
     signals.sort(key=lambda s: s.points, reverse=True)
 
     partial_content = parsed.body_truncated or links.truncated
     limitations = _limitations(parsed, auth.summary.source, partial_content)
-    fully_analyzed = parsed.sender is not None and not parsed.defects and not partial_content
+    if attachments.uninspected:
+        limitations.append(LIMIT_UNINSPECTED_ATTACHMENTS + "; ".join(attachments.uninspected[:3]))
+    fully_analyzed = (
+        parsed.sender is not None
+        and not parsed.defects
+        and not partial_content
+        and not attachments.uninspected
+    )
 
     score = min(100, sum(s.points for s in signals))
     verdict = _verdict(score, fully_analyzed)
@@ -93,5 +109,5 @@ def _summary(verdict: Verdict, signals: list[Signal], limitations: list[str]) ->
             return f"Low risk. Minor finding: {risky[0].title}."
         if limitations:
             return "No risk signals found, but some checks could not be completed."
-        return "No risk signals found in the sender, authentication and link checks."
+        return "No risk signals found in any of the checks."
     return f"{len(risky)} risk signal(s) found. Most serious: {risky[0].title}."

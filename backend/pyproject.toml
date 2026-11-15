@@ -42,3 +42,4 @@ select = [
 "tests/**" = ["S101", "S105", "S106"]
 # Review cases are literal URLs; splitting them would hurt readability.
 "tests/test_links_review_cases.py" = ["S101", "E501"]
+"tests/test_attachments_content_review_cases.py" = ["S101", "E501"]

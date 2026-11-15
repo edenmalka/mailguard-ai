@@ -12,6 +12,7 @@ from __future__ import annotations
 import ipaddress
 import re
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import unquote, urlsplit
@@ -50,7 +51,7 @@ class Link:
     query: str
     has_userinfo: bool  # "user@host" form, used to disguise the real host
     text: str | None  # visible link text (HTML links only), invisible characters removed
-    source: str  # "html_link" | "html_form" | "text" | "embedded"
+    source: str  # "html_link" | "html_form" | "text" | "embedded" | "attachment"
 
 
 @dataclass(frozen=True)
@@ -59,14 +60,9 @@ class LinkExtraction:
     truncated: bool  # more links existed than MAX_LINKS
 
 
-def extract_links(parsed: ParsedEmail) -> LinkExtraction:
-    collector = _HtmlLinkCollector()
-    try:
-        collector.feed(parsed.html_body)
-        collector.close()
-    except Exception:  # HTMLParser is lenient; keep whatever was collected
-        collector.flush_open_anchors()
-
+def extract_links(parsed: ParsedEmail, extra_urls: Sequence[str] = ()) -> LinkExtraction:
+    """Links from the HTML and text bodies, plus `extra_urls` found inside attachments."""
+    collector = _collect_html(parsed.html_body)
     found = list(collector.found)
     truncated = collector.overflow
     for match in _TEXT_URL.finditer(parsed.text_body):
@@ -74,6 +70,11 @@ def extract_links(parsed: ParsedEmail) -> LinkExtraction:
             truncated = True
             break
         found.append((match.group(0).rstrip(_TRAILING_PUNCTUATION), None, "text"))
+    for url in extra_urls:
+        if len(found) >= MAX_LINKS:
+            truncated = True
+            break
+        found.append((url, None, "attachment"))
 
     links: list[Link] = []
     seen: set[tuple[str, str | None, str]] = set()
@@ -86,6 +87,21 @@ def extract_links(parsed: ParsedEmail) -> LinkExtraction:
         if link is not None:
             links.append(link)
     return LinkExtraction(links, truncated)
+
+
+def html_link_urls(html: str) -> list[str]:
+    """Link and form targets in an HTML document (used for HTML attachments)."""
+    return [url for url, _, _ in _collect_html(html).found if url]
+
+
+def _collect_html(html: str) -> _HtmlLinkCollector:
+    collector = _HtmlLinkCollector()
+    try:
+        collector.feed(html)
+        collector.close()
+    except Exception:  # HTMLParser is lenient; keep whatever was collected
+        collector.flush_open_anchors()
+    return collector
 
 
 def parse_link(raw_url: str, text: str | None = None, source: str = "text") -> Link | None:

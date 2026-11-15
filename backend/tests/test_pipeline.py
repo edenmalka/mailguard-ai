@@ -11,6 +11,7 @@ from app.pipeline import (
     LIMIT_NO_AUTH,
     LIMIT_NO_SENDER,
     LIMIT_PARTIAL_CONTENT,
+    LIMIT_UNINSPECTED_ATTACHMENTS,
     analyze_email,
 )
 from tests.conftest import encode_message
@@ -209,4 +210,85 @@ def test_oversized_body_is_inconclusive_not_safe() -> None:
 def test_worst_case_html_is_analyzed_quickly(html: str) -> None:
     start = time.perf_counter()
     analyze_email(_html_message(html), GMAIL)
+    assert time.perf_counter() - start < 5
+
+
+# --- Attachments and content (Step 6) --------------------------------------------------------
+
+from tests.helpers import (  # noqa: E402
+    FAKE_EXE,
+    PDF_CLEAN,
+    email_with_attachments,
+    make_zip,
+)
+
+
+def _with_auth(raw: bytes) -> bytes:
+    return b"Authentication-Results: mx.google.com; spf=pass; dkim=pass; dmarc=pass\r\n" + raw
+
+
+def test_ordinary_invoice_email_is_low_risk() -> None:
+    raw = _with_auth(
+        email_with_attachments(
+            [("Invoice-1042.pdf", "application/pdf", PDF_CLEAN)],
+            body="Hi Maria, invoice #1042 for October is attached. Thanks!",
+        )
+    )
+    result = analyze_email(raw, GMAIL)
+    assert result.verdict == "safe"
+    assert result.score == 0
+
+
+def test_link_inside_pdf_attachment_is_analyzed() -> None:
+    pdf = b"%PDF-1.4\n<</A <</S /URI /URI (https://paypa1-login.example/x)>>>>\n"
+    result = analyze_email(
+        _with_auth(email_with_attachments([("a.pdf", "application/pdf", pdf)])), GMAIL
+    )
+    lookalike = next(s for s in result.signals if s.id == "link.lookalike")
+    assert "found inside an attachment" in (lookalike.evidence or "")
+
+
+def test_uninspectable_archive_is_inconclusive_not_safe() -> None:
+    rar = b"Rar!\x1a\x07\x01\x00" + bytes(16)
+    result = analyze_email(_with_auth(email_with_attachments([("files.rar", "x/y", rar)])), GMAIL)
+    assert result.score < 30
+    assert result.verdict == "inconclusive"
+    assert any(limit.startswith(LIMIT_UNINSPECTED_ATTACHMENTS) for limit in result.limitations)
+
+
+def test_malware_delivery_email_is_malicious() -> None:
+    raw = _with_auth(
+        email_with_attachments(
+            [("Invoice.zip", "application/zip", make_zip({"Invoice.pdf.exe": FAKE_EXE}))],
+            body="URGENT: overdue invoice attached. Pay immediately.",
+        )
+    )
+    result = analyze_email(raw, GMAIL)
+    assert result.verdict == "malicious"
+
+
+@pytest.mark.parametrize(
+    "attachment",
+    [
+        (
+            "many-links.pdf",
+            "application/pdf",
+            b"%PDF-1.4\n" + b"".join(b"/URI (https://h%d.example/)\n" % i for i in range(60_000)),
+        ),
+        ("many-files.zip", "application/zip", make_zip({f"f{i}.txt": b"" for i in range(30_000)})),
+        ("big.html", "text/html", b"<html>" + b"<a href='https://x.example/'>x</a>" * 40_000),
+        ("big.bin", "application/octet-stream", bytes(1_400_000)),
+    ],
+)
+def test_worst_case_attachments_are_analyzed_quickly(attachment) -> None:
+    raw = email_with_attachments([attachment])[: 2 * 1024 * 1024]
+    start = time.perf_counter()
+    analyze_email(raw, GMAIL)
+    assert time.perf_counter() - start < 5
+
+
+def test_worst_case_content_text_is_analyzed_quickly() -> None:
+    body = "verify your account wire transfer urgent " * 40_000
+    start = time.perf_counter()
+    analyze_email(_with_auth(email_with_attachments([], body=body)), GMAIL)
     assert time.perf_counter() - start < 5

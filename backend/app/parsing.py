@@ -41,9 +41,10 @@ class EmailAddress:
 
 @dataclass(frozen=True)
 class Attachment:
-    filename: str | None
-    content_type: str
+    filename: str | None  # base name only (any path is removed); None if the part has none
+    content_type: str  # as DECLARED by the sender: untrusted
     size: int
+    data: bytes = field(default=b"", repr=False, compare=False)  # decoded content
 
 
 @dataclass
@@ -213,15 +214,25 @@ def _read_leaf_part(
         parsed.defects.append("UnreadablePartHeaders")
         filename, disposition = None, None
 
-    if filename or disposition == "attachment":
+    is_body_text = content_type in {"text/plain", "text/html"}
+    # Anything that is not body text is treated as an attachment, even without a filename or
+    # an "attachment" label: otherwise a program sent as an unnamed part would go unseen.
+    if filename or disposition == "attachment" or not is_body_text:
         payload = _payload_bytes(part, parsed)
-        parsed.attachments.append(Attachment(filename, content_type, len(payload)))
+        name = _base_name(filename) if filename else None
+        parsed.attachments.append(Attachment(name, content_type, len(payload), payload))
         return
 
     if content_type == "text/plain":
         text_parts.append(_decode_text(part, parsed))
-    elif content_type == "text/html":
+    else:
         html_parts.append(_decode_text(part, parsed))
+
+
+def _base_name(filename: str) -> str:
+    """Drop any directory part ("../../x.exe" -> "x.exe"); keep the name otherwise as sent."""
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1].strip()
+    return name[:MAX_HEADER_CHARS] or filename[:MAX_HEADER_CHARS]
 
 
 def _payload_bytes(part: Message, parsed: ParsedEmail) -> bytes:
