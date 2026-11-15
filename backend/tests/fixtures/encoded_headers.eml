@@ -1,0 +1,22 @@
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@gmail.com header.s=20230601;
+       spf=pass smtp.mailfrom=mg-test-someone@gmail.com;
+       dmarc=pass (p=NONE sp=QUARANTINE dis=NONE) header.from=gmail.com
+From: =?UTF-8?B?UGF5UGFsIFNlY3VyaXR5?= <mg-test-someone@gmail.com>
+To: victim@example.org
+Subject: =?ISO-8859-1?Q?Acc=E8s_suspendu?=
+Date: Sat, 14 Nov 2026 17:40:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="b1"
+
+--b1
+Content-Type: text/plain; charset=iso-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+Votre acc=E8s est suspendu.
+--b1
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: base64
+
+PHA+Vm90cmUgYWNjw6hzIGVzdCBzdXNwZW5kdS48L3A+
+--b1--

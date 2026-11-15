@@ -1,0 +1,15 @@
+Return-Path: <x@attacker.test>
+Received: from attacker.test (unknown [203.0.113.9])
+        by mx.google.com with ESMTP id r; Sat, 14 Nov 2026 09:30:00 -0800 (PST)
+Authentication-Results: mx.google.com;
+       spf=softfail (google.com: domain of transitioning x@attacker.test does not designate 203.0.113.9 as permitted sender) smtp.mailfrom=x@attacker.test;
+       dmarc=fail (p=QUARANTINE sp=QUARANTINE dis=QUARANTINE) header.from=example.com
+Authentication-Results: mx.google.com; spf=pass smtp.mailfrom=ceo@example.com; dkim=pass header.i=@example.com; dmarc=pass header.from=example.com
+From: CEO <ceo@example.com>
+To: finance@example.com
+Subject: Urgent wire transfer
+Date: Sat, 14 Nov 2026 17:30:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Please process the attached payment today.

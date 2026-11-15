@@ -16,19 +16,43 @@ class AnalyzeRequest(BaseModel):
 
 
 class Verdict(StrEnum):
-    SAFE = "safe"
+    SAFE = "safe"  # low risk: no significant signals in a fully analyzed message
     SUSPICIOUS = "suspicious"
     MALICIOUS = "malicious"
+    # Low score, but the message could not be fully analyzed (e.g. malformed, no sender).
+    # Never reported as "safe": absence of evidence from a partial analysis proves little.
+    INCONCLUSIVE = "inconclusive"
 
 
 class Signal(BaseModel):
-    """One piece of evidence that contributed to the score."""
+    """One piece of evidence. Points are 0 for purely informational findings."""
 
     id: str
+    category: str
     title: str
-    points: int
+    points: int = Field(ge=0)
     explanation: str
     evidence: str | None = None
+
+
+class AuthSource(StrEnum):
+    # Results written by a mail server we trust (Gmail), read from the message headers.
+    # MailGuard did not re-run the checks itself.
+    REPORTED = "reported"
+    # Reserved for checks MailGuard performs itself (e.g. DKIM signature verification).
+    VERIFIED = "verified"
+    # No trustworthy results were available.
+    UNAVAILABLE = "unavailable"
+
+
+class AuthenticationSummary(BaseModel):
+    """SPF/DKIM/DMARC outcome and, crucially, where it came from."""
+
+    source: AuthSource
+    reported_by: str | None = None  # e.g. "mx.google.com"
+    spf: str = "unknown"
+    dkim: str = "unknown"
+    dmarc: str = "unknown"
 
 
 class AnalyzeResponse(BaseModel):
@@ -36,6 +60,9 @@ class AnalyzeResponse(BaseModel):
     verdict: Verdict
     summary: str
     signals: list[Signal]
+    authentication: AuthenticationSummary | None = None
+    # Plain-language notes on what could not be checked for this message.
+    limitations: list[str] = Field(default_factory=list)
 
 
 def decode_raw_message(encoded: str) -> bytes:

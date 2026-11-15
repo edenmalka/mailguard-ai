@@ -1,0 +1,15 @@
+Return-Path: <x@bulk-sender.test>
+Received: from bulk-sender.test (unknown [203.0.113.5])
+        by mx.google.com with ESMTP id q; Sat, 14 Nov 2026 09:20:00 -0800 (PST)
+Authentication-Results: mx.google.com;
+       spf=fail (google.com: domain of x@bulk-sender.test does not designate 203.0.113.5 as permitted sender) smtp.mailfrom=x@bulk-sender.test;
+       dmarc=fail (p=REJECT sp=REJECT dis=QUARANTINE) header.from=microsoft.com
+From: Microsoft account team <no-reply@microsoft.com>
+Reply-To: mg-test-security-desk@outlook.com
+To: victim@example.org
+Subject: Unusual sign-in activity
+Date: Sat, 14 Nov 2026 17:20:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Please review the recent sign-in to your account.

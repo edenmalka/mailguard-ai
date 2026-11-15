@@ -1,0 +1,23 @@
+Delivered-To: reader@example.org
+Received: by 2002:a05:6000:1:b0:1:2:3 with SMTP id x; Sat, 14 Nov 2026 09:00:01 -0800 (PST)
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@example.com header.s=s1;
+       spf=pass smtp.mailfrom=news@example.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=example.com
+Return-Path: <bounces@mail.example.com>
+Received: from mail.example.com (mail.example.com. [192.0.2.10])
+        by mx.google.com with ESMTPS id y; Sat, 14 Nov 2026 09:00:00 -0800 (PST)
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@example.com header.s=s1 header.b=AbCdEf12;
+       spf=pass (google.com: domain of bounces@mail.example.com designates 192.0.2.10 as permitted sender) smtp.mailfrom=bounces@mail.example.com;
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=example.com
+From: Example News <news@example.com>
+Reply-To: Example Support <support@help.example.com>
+To: reader@example.org
+Subject: Your weekly digest
+Date: Sat, 14 Nov 2026 17:00:00 +0000
+Message-ID: <digest-1@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Here are this week's top stories.

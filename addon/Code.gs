@@ -13,10 +13,12 @@
 /** Must match the backend setting MAILGUARD_MAX_MESSAGE_BYTES. */
 var MAX_MESSAGE_BYTES = 2 * 1024 * 1024;
 
+// "safe" is shown as "Low risk": a scanner can find evidence of danger, not prove safety.
 var VERDICT_STYLES = {
-  safe: { label: 'Safe', color: '#188038' },
+  safe: { label: 'Low risk', color: '#188038' },
   suspicious: { label: 'Suspicious', color: '#E37400' },
   malicious: { label: 'Malicious', color: '#D93025' },
+  inconclusive: { label: 'Inconclusive', color: '#5F6368' },
 };
 
 /** An error whose message is safe to show to the user. */
@@ -158,7 +160,18 @@ function validateResult_(data) {
   var signals = data.signals.filter(function (s) {
     return s && typeof s.title === 'string' && typeof s.points === 'number';
   });
-  return { score: Math.round(data.score), verdict: data.verdict, summary: data.summary, signals: signals };
+  var limitations = Array.isArray(data.limitations)
+    ? data.limitations.filter(function (l) {
+        return typeof l === 'string';
+      })
+    : [];
+  return {
+    score: Math.round(data.score),
+    verdict: data.verdict,
+    summary: data.summary,
+    signals: signals,
+    limitations: limitations,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +198,7 @@ function buildResultCard_(result) {
   } else {
     result.signals.forEach(function (signal) {
       var widget = CardService.newDecoratedText()
-        .setTopLabel('+' + signal.points + ' points')
+        .setTopLabel(signal.points > 0 ? '+' + signal.points + ' points' : 'Info')
         .setText(escapeHtml_(signal.title))
         .setWrapText(true);
       if (typeof signal.explanation === 'string') {
@@ -195,11 +208,19 @@ function buildResultCard_(result) {
     });
   }
 
-  return CardService.newCardBuilder()
+  var card = CardService.newCardBuilder()
     .setHeader(CardService.newCardHeader().setTitle('MailGuard').setSubtitle('Email risk analysis'))
     .addSection(overview)
-    .addSection(reasons)
-    .build();
+    .addSection(reasons);
+
+  if (result.limitations.length > 0) {
+    var limits = CardService.newCardSection().setHeader('Limits of this analysis');
+    result.limitations.forEach(function (text) {
+      limits.addWidget(CardService.newTextParagraph().setText('• ' + escapeHtml_(text)));
+    });
+    card.addSection(limits);
+  }
+  return card.build();
 }
 
 function buildMessageCard_(text) {

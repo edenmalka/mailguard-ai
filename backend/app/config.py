@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     signature_max_age_seconds: int = Field(default=300, gt=0, le=3600)
     log_level: str = "INFO"
     enable_docs: bool = False
+    # Mail servers whose Authentication-Results headers are trusted (JSON list in env).
+    trusted_authserv_ids: list[str] = Field(default=["mx.google.com"], min_length=1)
 
     @field_validator("hmac_secret")
     @classmethod

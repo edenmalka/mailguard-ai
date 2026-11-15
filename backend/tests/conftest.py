@@ -19,7 +19,7 @@ SAMPLE_EMAIL = b"From: alice@example.com\r\nTo: bob@example.com\r\nSubject: Hi\r
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(hmac_secret=TEST_SECRET, max_message_bytes=1024, _env_file=None)
+    return Settings(hmac_secret=TEST_SECRET, max_message_bytes=8192, _env_file=None)
 
 
 @pytest.fixture

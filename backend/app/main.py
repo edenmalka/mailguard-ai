@@ -11,7 +11,8 @@ from pydantic import ValidationError
 
 from app import __version__
 from app.config import Settings
-from app.schemas import AnalyzeRequest, AnalyzeResponse, Verdict, decode_raw_message
+from app.pipeline import analyze_email
+from app.schemas import AnalyzeRequest, AnalyzeResponse, decode_raw_message
 from app.security import SIGNATURE_HEADER, TIMESTAMP_HEADER, verify_signature
 
 logger = logging.getLogger("mailguard")
@@ -43,6 +44,7 @@ async def read_limited_body(request: Request, limit: int) -> bytes:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()  # fails fast if MAILGUARD_HMAC_SECRET is missing
     logging.basicConfig(level=settings.log_level.upper())
+    trusted_authserv_ids = frozenset(i.lower() for i in settings.trusted_authserv_ids)
 
     app = FastAPI(
         title="MailGuard API",
@@ -82,15 +84,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if len(raw_message) > settings.max_message_bytes:
             raise HTTPException(status_code=413, detail="Message too large")
 
-        # Log metadata only: never the email content, sender, or recipients.
-        logger.info("analyze accepted: message_bytes=%d", len(raw_message))
+        # 4. Analyze. Exceptions are reduced to their type name before logging, because
+        #    exception messages can quote parts of the (private) email.
+        try:
+            result = analyze_email(raw_message, trusted_authserv_ids)
+        except Exception as exc:
+            logger.error("analysis failed: error_type=%s", type(exc).__name__)
+            raise HTTPException(status_code=500, detail="Analysis failed") from None
 
-        # 4. Placeholder until the analyzers are built (Steps 4-7).
-        return AnalyzeResponse(
-            score=0,
-            verdict=Verdict.SAFE,
-            summary="Placeholder result: analyzers are not implemented yet.",
-            signals=[],
+        # Log metadata only: never the email content, sender, or recipients.
+        logger.info(
+            "analyze done: message_bytes=%d score=%d verdict=%s signals=%d",
+            len(raw_message),
+            result.score,
+            result.verdict,
+            len(result.signals),
         )
+        return result
 
     return app
