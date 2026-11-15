@@ -1,0 +1,10 @@
+# Files NOT uploaded to Cloud Build. Keeps secrets and local clutter out of the build.
+.env
+.env.*
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+tests/
+.gcloudignore
