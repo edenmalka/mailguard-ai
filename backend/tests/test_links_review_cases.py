@@ -143,7 +143,7 @@ PHISHING = [
     ("Hex IP with path", '<a href="http://0xC0A80001/login">x</a>', ["link.ip_address"]),
     (
         "Safe Links wrapping a look-alike",
-        '<a href="https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpaypa1.com%2F">Sign in</a>',
+        '<a href="https://eur01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpaypa1.example%2F">Sign in</a>',
         ["link.lookalike"],
     ),
     (

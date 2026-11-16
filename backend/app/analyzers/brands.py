@@ -43,7 +43,7 @@ BRANDS: tuple[Brand, ...] = (
 )
 
 # Words that commonly accompany a brand in phishing display names and domains
-# ("PayPal Support", "paypal-secure.com"). A display name made only of a brand keyword
+# ("PayPal Support", "paypal-secure.example"). A display name made only of a brand keyword
 # plus these words is treated as claiming to be that brand.
 GENERIC_WORDS: frozenset[str] = frozenset(
     {

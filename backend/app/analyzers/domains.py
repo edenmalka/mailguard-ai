@@ -137,7 +137,7 @@ def find_lookalike(domain: str) -> Lookalike | None:
         for official in sorted(brand.domains):
             official_label = registrable_label(official)
 
-            # paypal.com.account-verify.net, mail.dhl.com.track.test: a brand domain used as
+            # paypal.com.account-verify.example, mail.dhl.com.track.test: a brand domain used as
             # subdomain labels of an unrelated domain, so the start of the name looks official.
             if f".{official}." in f".{domain}":
                 return Lookalike(brand, official, "subdomain")
@@ -148,14 +148,14 @@ def find_lookalike(domain: str) -> Lookalike | None:
             ):
                 return Lookalike(brand, official, "subdomain")
 
-            # paypa1.com, rnicrosoft.com: different characters that look the same.
+            # paypa1.example, rnicrosoft.example: different characters that look the same.
             if label != official_label and skeleton(label) == skeleton(official_label):
                 return Lookalike(brand, official, "homoglyph")
 
             if official_label in _DICTIONARY_LABELS:
                 continue
 
-            # paypall.com, micosoft.com: one or two typing mistakes away.
+            # paypall.example, micosoft.example: one or two typing mistakes away.
             max_distance = 2 if len(official_label) >= 9 else 1
             if (
                 len(official_label) >= _MIN_TYPO_LABEL_LENGTH
@@ -163,8 +163,8 @@ def find_lookalike(domain: str) -> Lookalike | None:
             ):
                 return Lookalike(brand, official, "typo")
 
-            # paypal-secure.com, paypa1-login.top, paypalsupport.com: brand name (possibly with
-            # look-alike characters) plus other words.
+            # paypal-secure.example, paypa1-login.example, paypalsupport.example: brand name
+            # (possibly with look-alike characters) plus other words.
             official_skeleton = skeleton(official_label)
             parts = label.split("-")
             if len(parts) > 1 and official_skeleton in {skeleton(p) for p in parts}:
