@@ -1,0 +1,11 @@
+Authentication-Results: mx.google.com; dkim=none header.i=@x; spf=fail smtp.mailfrom=x; dmarc=fail header.from=x
+From: Example Bank Security <security@examplebank.example>
+To: reader@example.org
+Subject: Unusual sign-in
+Reply-To: mg-test-bank-security@gmail.com
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+We need to discuss recent activity on your account. Please reply with a conve=
+nient time for a call.

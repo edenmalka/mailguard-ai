@@ -1,0 +1,22 @@
+Authentication-Results: mx.google.com; dkim=pass header.i=@x; spf=pass smtp.mailfrom=x; dmarc=pass header.from=x
+From: Sara <sara@contractor.example>
+To: reader@example.org
+Subject: Files
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============3553260803050964941=="
+
+--===============3553260803050964941==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+The files are attached.
+
+--===============3553260803050964941==
+Content-Type: application/x-rar
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="files.rar"
+MIME-Version: 1.0
+
+UmFyIRoHAQAAAAAAAAAAAAAAAAAAAAAA
+
+--===============3553260803050964941==--
