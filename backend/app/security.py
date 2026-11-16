@@ -10,10 +10,17 @@ timestamp in the signed data limits how long a captured request can be replayed.
 
 import hashlib
 import hmac
+import re
 import time
 
 TIMESTAMP_HEADER = "X-MailGuard-Timestamp"
 SIGNATURE_HEADER = "X-MailGuard-Signature"
+
+# Strict formats, checked BEFORE any conversion, so malformed headers from unauthenticated
+# clients are rejected (401) instead of raising errors (e.g. int() on 5,000 digits, or
+# compare_digest on non-ASCII text).
+_TIMESTAMP_FORMAT = re.compile(r"[0-9]{1,12}")
+_SIGNATURE_FORMAT = re.compile(r"[0-9a-fA-F]{64}")
 
 
 def compute_signature(secret: bytes, timestamp: str, body: bytes) -> str:
@@ -32,7 +39,7 @@ def verify_signature(
     """Return True only if the signature is valid and the timestamp is fresh."""
     if not timestamp or not signature:
         return False
-    if not timestamp.isascii() or not timestamp.isdigit():
+    if not _TIMESTAMP_FORMAT.fullmatch(timestamp) or not _SIGNATURE_FORMAT.fullmatch(signature):
         return False
 
     current = time.time() if now is None else now

@@ -130,8 +130,8 @@ def _display_name_signals(sender: EmailAddress) -> list[Signal]:
         )
 
     brand = claimed_brand(name)
-    # A free webmail address (e.g. "Google Support" <mg-test-x@gmail.com>) is never the brand itself,
-    # even when the brand operates that webmail service.
+    # A free webmail address (e.g. "Google Support" at a gmail.com address) is never the brand
+    # itself, even when the brand operates that webmail service.
     from_brand = official_brand_for(sender.domain)
     is_freemail = registrable_domain(sender.domain) in FREE_EMAIL_DOMAINS
     if brand is not None and (from_brand is not brand or is_freemail):

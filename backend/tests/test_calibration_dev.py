@@ -167,11 +167,11 @@ PHISHING = [
         "PayPal look-alike sender and link",
         MALICIOUS,
         email(
-            "PayPal Support <service@paypal-secure.com>",
+            "PayPal Support <service@paypal-secure.example>",
             reply_to="mg-test-paypal-help@gmail.com",
             subject="Account limited",
             text="Verify your account within 24 hours.",
-            html='<p><a href="https://paypa1-login.top/signin">https://www.paypal.com/signin</a></p>',
+            html='<p><a href="https://paypa1-login.example/signin">https://www.paypal.com/signin</a></p>',
         ),
     ),
     Case(
@@ -261,7 +261,7 @@ PHISHING = [
             "DHL Express <noreply@dhl-parcel-track.example>",
             subject="Delivery failed",
             text="Your parcel could not be delivered. Pay the redelivery fee here: "
-            "https://dhl-redeliver.top/pay",
+            "https://dhl-redeliver.example/pay",
         ),
     ),
     Case(

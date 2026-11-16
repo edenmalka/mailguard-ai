@@ -34,17 +34,17 @@ def test_skeleton_and_levenshtein() -> None:
 @pytest.mark.parametrize(
     ("domain", "brand", "technique"),
     [
-        ("paypa1.com", "PayPal", "homoglyph"),
-        ("rnicrosoft.com", "Microsoft", "homoglyph"),
-        ("paypall.com", "PayPal", "typo"),
-        ("micosoft.com", "Microsoft", "typo"),
-        ("paypal-secure.com", "PayPal", "combo"),
-        ("secure-paypal.net", "PayPal", "combo"),
-        ("paypa1-secure.com", "PayPal", "combo"),  # look-alike + extra word
-        ("paypalsupport.com", "PayPal", "combo"),
-        ("paypal.com.account-verify.net", "PayPal", "subdomain"),
+        ("paypa1.example", "PayPal", "homoglyph"),
+        ("rnicrosoft.example", "Microsoft", "homoglyph"),
+        ("paypall.example", "PayPal", "typo"),
+        ("micosoft.example", "Microsoft", "typo"),
+        ("paypal-secure.example", "PayPal", "combo"),
+        ("secure-paypal.example", "PayPal", "combo"),
+        ("paypa1-secure.example", "PayPal", "combo"),  # look-alike + extra word
+        ("paypalsupport.example", "PayPal", "combo"),
+        ("paypal.com.account-verify.example", "PayPal", "subdomain"),
         ("mail.dhl.com.parcel-track.test", "DHL", "subdomain"),
-        ("paypal.account-verify.com", "PayPal", "subdomain"),  # brand as subdomain label
+        ("paypal.account-verify.example", "PayPal", "subdomain"),  # brand as subdomain label
     ],
 )
 def test_lookalike_domains_are_detected(domain: str, brand: str, technique: str) -> None:

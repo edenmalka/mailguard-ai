@@ -276,7 +276,7 @@ PHISHING = [
         email(
             "Refunds <refunds@tax-office.example>",
             subject="Tax refund",
-            text="Claim your tax refund now: https://tax-refund.top/claim",
+            text="Claim your tax refund now: https://mg-test-tax-refund.top/claim",
         ),
     ),
     Case(

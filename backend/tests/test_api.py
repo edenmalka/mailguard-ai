@@ -81,3 +81,50 @@ def test_api_docs_are_disabled_by_default(client: TestClient) -> None:
 def test_weak_secret_is_refused_at_startup() -> None:
     with pytest.raises(ValidationError):
         Settings(hmac_secret="too-short", _env_file=None)
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"X-MailGuard-Timestamp": b"1" * 4301, "X-MailGuard-Signature": b"a" * 64},
+        {
+            "X-MailGuard-Timestamp": str(int(time.time())).encode(),
+            "X-MailGuard-Signature": b"\xe9" * 64,
+        },
+    ],
+)
+def test_malformed_auth_headers_get_401_not_500(client: TestClient, headers: dict) -> None:
+    body = b'{"raw_message":"aGk="}'
+    response = client.post(
+        "/analyze", content=body, headers={"Content-Type": "application/json", **headers}
+    )
+    assert response.status_code == 401
+
+
+def test_server_stays_responsive_during_a_slow_analysis(settings: Settings) -> None:
+    """Found in the final review: analysis used to block the event loop (health waited ~1 s)."""
+    import asyncio
+    import base64
+
+    import httpx
+
+    from app.main import create_app
+
+    app = create_app(settings.model_copy(update={"max_message_bytes": 2 * 1024 * 1024}))
+    raw = ("From: a@example.com\r\nContent-Type: text/html\r\n\r\n" + "<" * 1_900_000).encode()
+    body = json.dumps({"raw_message": base64.urlsafe_b64encode(raw).decode()}).encode()
+
+    async def scenario() -> float:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
+            slow = asyncio.create_task(
+                client.post("/analyze", content=body, headers=sign_headers(body))
+            )
+            start = time.perf_counter()
+            await asyncio.sleep(0.05)
+            assert (await client.get("/health")).status_code == 200
+            waited = time.perf_counter() - start
+            assert (await slow).status_code == 200
+            return waited
+
+    assert asyncio.run(scenario()) < 0.5

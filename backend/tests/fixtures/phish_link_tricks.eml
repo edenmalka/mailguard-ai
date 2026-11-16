@@ -18,7 +18,8 @@ Confirm your details at https://bit.ly/3fakeId before your access expires.
 Content-Type: text/html; charset=utf-8
 
 <html><body>
-<p>Your mailbox will be closed. <a href="https://paypa1-login.top/signin?u=1">https://www.paypal.com/signin</a></p>
+<p>Your mailbox will be closed. <a href="https://paypa1-login.example/signin?u=1">https://www.paypal.com/signin</a></p>
+<p><a href="https://mg-test-offer.top/details">Details</a></p>
 <p>Or sign in here:</p>
 <form action="http://198.51.100.23/collect"><input name="password" type="password"></form>
 <p><a href="https://www.paypal.com@login-check.example/verify">PayPal Account Center</a></p>

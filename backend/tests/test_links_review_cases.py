@@ -91,7 +91,7 @@ LEGITIMATE = [
 PHISHING = [
     (
         "Google open redirect to look-alike",
-        '<a href="https://www.google.com/url?q=https://paypa1.com/login">Sign in</a>',
+        '<a href="https://www.google.com/url?q=https://paypa1.example/login">Sign in</a>',
         ["link.lookalike"],
     ),
     (
@@ -189,7 +189,7 @@ PHISHING = [
     ),
     (
         "Brand as subdomain on real-world style TLD",
-        '<a href="https://dhl.parcel-redelivery.com/">Track</a>',
+        '<a href="https://dhl.parcel-redelivery.example/">Track</a>',
         ["link.lookalike"],
     ),
 ]

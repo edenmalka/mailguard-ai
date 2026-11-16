@@ -24,8 +24,8 @@ def _ids(html: str) -> set[str]:
     [
         ('<a href="https://evil.example/">https://www.paypal.com</a>', "link.text_mismatch"),
         ('<a href="https://evil.example/">Go to www.mybank.com now</a>', "link.text_mismatch"),
-        ('<a href="https://paypa1.com/">Log in</a>', "link.lookalike"),
-        ('<a href="https://paypa1-login.top/">Log in</a>', "link.lookalike"),
+        ('<a href="https://paypa1.example/">Log in</a>', "link.lookalike"),
+        ('<a href="https://paypa1-login.example/">Log in</a>', "link.lookalike"),
         ('<a href="https://paypal.com.secure-check.example/">x</a>', "link.lookalike"),
         ('<a href="https://www.paypal.com@evil.example/">x</a>', "link.userinfo"),
         ('<a href="https://files.example.net/invoice.pdf.exe">x</a>', "link.dangerous_file"),
@@ -39,7 +39,7 @@ def _ids(html: str) -> set[str]:
         ('<a href="https://bit.ly/abc">x</a>', "link.shortener"),
         ('<a href="https://xn--bcher-kva.example/">x</a>', "link.punycode"),
         ('<a href="https://login.example.top/">x</a>', "link.risky_tld"),
-        ('<a href="https://invoice.zip/">invoice</a>', "link.risky_tld"),
+        ('<a href="https://mg-test-invoice.zip/">invoice</a>', "link.risky_tld"),
     ],
 )
 def test_each_trick_is_detected(html: str, signal: str) -> None:
@@ -87,7 +87,7 @@ def test_form_destination_is_also_checked() -> None:
 
 
 def test_lookalike_signal_names_the_brand() -> None:
-    signals = _analyze_html('<a href="https://paypa1.com/">Log in</a>').signals
+    signals = _analyze_html('<a href="https://paypa1.example/">Log in</a>').signals
     lookalike = next(s for s in signals if s.id == "link.lookalike")
     assert lookalike.title == "Link imitates PayPal"
 

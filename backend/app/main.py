@@ -8,6 +8,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import ValidationError
+from starlette.concurrency import run_in_threadpool
 
 from app import __version__
 from app.config import Settings
@@ -26,7 +27,7 @@ async def read_limited_body(request: Request, limit: int) -> bytes:
     """
     declared = request.headers.get("content-length")
     if declared is not None:
-        if not declared.isdigit():
+        if not (declared.isascii() and declared.isdigit()):
             raise HTTPException(status_code=400, detail="Invalid Content-Length")
         if int(declared) > limit:
             raise HTTPException(status_code=413, detail="Request too large")
@@ -84,10 +85,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if len(raw_message) > settings.max_message_bytes:
             raise HTTPException(status_code=413, detail="Message too large")
 
-        # 4. Analyze. Exceptions are reduced to their type name before logging, because
-        #    exception messages can quote parts of the (private) email.
+        # 4. Analyze in a worker thread: analysis is CPU-bound, and running it directly in
+        #    this async handler would block every other request on the instance while it runs.
+        #    Exceptions are reduced to their type name before logging, because exception
+        #    messages can quote parts of the (private) email.
         try:
-            result = analyze_email(raw_message, trusted_authserv_ids)
+            result = await run_in_threadpool(analyze_email, raw_message, trusted_authserv_ids)
         except Exception as exc:
             logger.error("analysis failed: error_type=%s", type(exc).__name__)
             raise HTTPException(status_code=500, detail="Analysis failed") from None

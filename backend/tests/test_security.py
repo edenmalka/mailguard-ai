@@ -54,3 +54,12 @@ def test_missing_or_malformed_headers_are_rejected() -> None:
     assert _verify(timestamp="12.5") is False
     assert _verify(timestamp="-1") is False
     assert _verify(timestamp="١٢٣") is False  # non-ASCII digits
+
+
+def test_oversized_or_non_ascii_values_are_rejected_without_errors() -> None:
+    # Found in the final review: these used to raise inside verify_signature (HTTP 500).
+    assert _verify(timestamp="1" * 4301) is False  # beyond Python's int() digit limit
+    assert _verify(timestamp="1" * 13) is False
+    assert _verify(signature="\xe9" * 64) is False  # non-ASCII: compare_digest would raise
+    assert _verify(signature="a" * 63) is False
+    assert _verify(signature="z" * 64) is False

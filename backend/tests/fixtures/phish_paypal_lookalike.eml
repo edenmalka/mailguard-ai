@@ -1,16 +1,16 @@
-Return-Path: <bounce@paypal-secure.com>
-Received: from mail.paypal-secure.com (mail.paypal-secure.com. [198.51.100.7])
+Return-Path: <bounce@paypal-secure.example>
+Received: from mail.paypal-secure.example (mail.paypal-secure.example. [198.51.100.7])
         by mx.google.com with ESMTPS id z; Sat, 14 Nov 2026 09:10:00 -0800 (PST)
 Authentication-Results: mx.google.com;
-       dkim=pass header.i=@paypal-secure.com header.s=k1 header.b=ZZZZ;
-       spf=pass (google.com: domain of bounce@paypal-secure.com designates 198.51.100.7 as permitted sender) smtp.mailfrom=bounce@paypal-secure.com;
-       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=paypal-secure.com
-From: "PayPal Support" <service@paypal-secure.com>
+       dkim=pass header.i=@paypal-secure.example header.s=k1 header.b=ZZZZ;
+       spf=pass (google.com: domain of bounce@paypal-secure.example designates 198.51.100.7 as permitted sender) smtp.mailfrom=bounce@paypal-secure.example;
+       dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=paypal-secure.example
+From: "PayPal Support" <service@paypal-secure.example>
 Reply-To: mg-test-paypal-resolution@gmail.com
 To: victim@example.org
 Subject: Your account has been limited
 Date: Sat, 14 Nov 2026 17:10:00 +0000
-Message-ID: <limit-77@paypal-secure.com>
+Message-ID: <limit-77@paypal-secure.example>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=utf-8
 
