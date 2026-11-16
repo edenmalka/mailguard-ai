@@ -9,6 +9,7 @@ from app.analyzers.attachments import analyze_attachments
 from app.analyzers.authentication import analyze_authentication
 from app.analyzers.content import analyze_content
 from app.analyzers.links import analyze_links
+from app.analyzers.requests import analyze_requests
 from app.analyzers.sender import analyze_sender
 from app.analyzers.structure import analyze_structure
 from app.parsing import ParsedEmail, parse_email
@@ -46,6 +47,7 @@ def analyze_email(raw: bytes, trusted_authserv_ids: frozenset[str]) -> AnalyzeRe
         *links.signals,
         *attachments.signals,
         *analyze_content(parsed),
+        *analyze_requests(parsed),
         *analyze_structure(parsed),
     ]
 

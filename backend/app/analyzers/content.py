@@ -60,7 +60,8 @@ _RULES = (
             r"|payment\s+(?:details|information|method)|bank(?:ing)?\s+details)",
             r"(?:enter|provide|re-?enter|submit)\s+your\s+(?:password|login|credentials|pin"
             r"|social\s+security|ssn|card\s+(?:number|details))",
-            r"your\s+(?:account|mailbox|password|email\s+account)\s+(?:has\s+been|will\s+be|is)"
+            r"your\s+(?:account|mailbox|password|email\s+account)\s+(?:has\s+been|will\s+be|is"
+            r"|from\s+being|could\s+be|may\s+be|might\s+be)"
             r"\s+(?:suspended|locked|disabled|deactivated|closed|compromised|restricted"
             r"|limited|expired|on\s+hold)",
             r"(?:mailbox|email\s+storage)\s+(?:is\s+)?(?:full|almost\s+full|over\s+quota"
@@ -153,10 +154,16 @@ _RULES = (
 )
 
 
-def analyze_content(parsed: ParsedEmail) -> list[Signal]:
-    text = normalize_text(
-        " \n ".join((parsed.subject, parsed.text_body[:MAX_SCAN_CHARS], html_to_text(parsed)))
+def message_text(parsed: ParsedEmail) -> str:
+    """Normalized subject + plain-text body + visible HTML text (shared by wording analyzers)."""
+    return normalize_text(
+        # " . " keeps the subject and body as separate sentences after whitespace is collapsed.
+        " . ".join((parsed.subject, parsed.text_body[:MAX_SCAN_CHARS], html_to_text(parsed)))
     )[: MAX_SCAN_CHARS * 2]
+
+
+def analyze_content(parsed: ParsedEmail) -> list[Signal]:
+    text = message_text(parsed)
     signals = []
     budget = MAX_CONTENT_POINTS  # rules are ordered by importance and share this budget
     for rule in _RULES:

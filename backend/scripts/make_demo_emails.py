@@ -76,6 +76,15 @@ DEMO_EMAILS: dict[str, bytes] = {
             ),
         ),
     ),
+    "08_credential_theft_by_reply.eml": email(
+        "IT Support <mg-test-it-support@gmail.com>",
+        subject="Employee account verification",
+        text="Hello,\n\nWe are updating our employee access records this week.\n\n"
+        "To prevent your account from being suspended, please reply directly to this email with "
+        "your work email address, current password, and the latest verification code sent to "
+        "your phone.\n\nPlease complete this today so your access is not interrupted.\n\n"
+        "IT Support",
+    ),
     "07_inconclusive_archive.eml": email(
         "Sara <sara@contractor.example>",
         subject="Files",

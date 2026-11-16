@@ -45,8 +45,8 @@ When you open an email, MailGuard shows a card in Gmail's sidebar with:
 - **A verdict:** *Low risk*, *Suspicious*, *Malicious*, or *Inconclusive* when the email could
   not be fully analyzed (MailGuard never calls a partially checked email "safe").
 - **A score from 0 to 100**, where the points on the card add up to the score.
-- **The attack it resembles** (credential phishing, payment fraud, malware delivery, sender
-  spoofing) and **concrete advice** for that attack.
+- **The attack it resembles** (credential phishing, credential theft by reply, payment fraud,
+  malware delivery, sender spoofing) and **concrete advice** for that attack.
 - **The reasons**, each with evidence, and an explicit list of **what could not be checked**.
 
 **Product decisions**
@@ -120,6 +120,7 @@ list with plain-language explanations is in the code and shown on the card.
 | **Sender** (50) | Display name claims a brand from another domain or from free webmail (30) · look-alike domain: homoglyph `paypa1`, typo `paypall`, extra words `paypal-secure`, brand as subdomain `paypal.evil.example` (30) · replies go to free webmail (25) / another organization (15) · address hidden in display name (25) · multiple From (20) · punycode domain (15) · hidden bidi/zero-width characters (15) · no valid sender (10) |
 | **Links** (50) | Text shows a different domain than the link (30) · look-alike domain (30) · `user@host` disguise (25) · program download (25) · form inside the email (25) · bare or obfuscated IP such as `http://3232235777` (20) · `javascript:`, `data:`, `file:`, `ms-msdt:` schemes (20) · shortener (10) · punycode (10) · abused TLD such as `.top` or `.zip` (10) |
 | **Attachments** (60) | Program, script, shortcut or disk image (40) · disguised: `invoice.pdf.exe`, RTLO name, "PDF" that is really a program (35) · archive containing a program (35) · Office macros (30) · HTML/SVG with scripts or forms (30) / plain (15) · PDF with JavaScript or an embedded program, RTF with objects (25) · password-protected archive (20, or 30 if the password is in the email) |
+| **Requests** (40) | Asks you to **send** a password, PIN, one-time or verification code, recovery codes, security answers, card number or CVV, or SSN by reply or message (40). Ignored when negated ("we will never ask you to send…"), for shared codes (meeting or Wi-Fi passcodes), and when the secret belongs to another clause ("tell your manager if anyone asks for your password"). |
 | **Wording** (25) | Credential request (15) · payment or bank-detail request (15) · secrecy or "quick favor" (10) · prize or refund (10) · urgency (5) · "Dear customer" (5) |
 | **Format** (10) | Malformed MIME structure (5) |
 
@@ -145,11 +146,14 @@ score = Σ  min(category points, category budget)  +  strongest attack-pattern b
    | Credential phishing | deceptive link or sender **and** password request, form, or active HTML attachment | +20 |
    | Payment fraud (BEC) | reply redirection or impersonation **and** payment or secrecy request; or free-webmail sender **and** an actual money request (CEO fraud) | +20 |
    | Malware delivery | program, macro or active document **and** a disguise, lure or deceptive sender/link | +20 |
+   | Credential theft by reply | a request to **send** a secret **and** pressure or an identity trick (account threat, urgency, free webmail, reply redirection, DMARC fail, brand or look-alike sender); no link needed | +20 |
    | Sender spoofing | DMARC fail **and** another identity trick | +15 |
 
 3. **Verdict.** `< 30` Low risk (or *Inconclusive* if analysis was incomplete) · `30–69` Suspicious ·
-   `≥ 70` Malicious. Wording is capped at 25 points, so **wording alone can never make an email
-   Suspicious**.
+   `≥ 70` Malicious. Wording is capped at 25 points, so persuasive **wording alone can never make
+   an email Suspicious**. One deliberate, narrow exception: an explicit request to **send** a
+   password or security code (40 points). Legitimate organizations never ask for these by email,
+   so the request itself is strong evidence even without a link.
 
 ### Trust model for SPF, DKIM and DMARC
 
@@ -187,7 +191,7 @@ MailGuard would perform itself).
 
 ## 5. Testing and evaluation
 
-**539 tests** (plus 4 documented expected failures) run in about 5 seconds:
+**637 tests** (plus 6 documented expected failures) run in about 5 seconds:
 `cd backend && uv run pytest`.
 
 | Area | What is covered |
@@ -205,7 +209,13 @@ results were reported as measured. These reviews found real problems: the first 
 analyzer raised false alarms on 8 of 15 legitimate links and missed 11 of 13 phishing patterns
 (security-gateway rewrites, file names read as domains, browser-tolerated malformed URLs). For
 wording rules, the second review showed that adding phrases caused new false alarms, so rules
-were narrowed instead. All 170+ review and calibration cases are kept as regression tests.
+were narrowed instead. The secret-request rule was added after an **unseen live Gmail test**
+scored an email asking for a password and a verification code by reply as *Low risk 0*; it was
+then checked against three fresh held-out rounds (first runs: 9/12 detected with 2/12 false
+alarms; 10/10 with 0/10, though one detection was accidental and a probe exposed a noun/verb false
+alarm class; 8/8 with 2/8, one being a negation bug with contractions). Each problem was fixed with
+a general rule and disclosed in the test files; two accepted misses are kept as expected failures.
+All 230+ review and calibration cases are kept as regression tests.
 
 **Calibration.** The scoring engine was tuned on a development set of 30 labeled emails, then
 measured **once** on a separate held-out set of 30 written before it was run:
@@ -337,7 +347,7 @@ A demo runbook with preflight checks and fallbacks is in [`docs/DEMO.md`](docs/D
 | Rules and transparent points instead of a trained model | Every verdict is explainable and testable; no training data needed | Lower recall on novel wording; weights are expert judgment |
 | Read Gmail's authentication results instead of re-verifying | Fast, no DNS calls, Gmail saw the real connection | Depends on Gmail; another provider's results show as *unavailable* |
 | Never follow links, no reputation lookups | Privacy (nothing leaves the backend), no SSRF, no tipping off attackers | Clean-looking links to compromised sites or redirectors are missed |
-| Wording capped at 25 points | Very few false alarms from marketing or legitimate billing | Wording-only scams (giveaways, refund lures) stay *Low risk* |
+| Wording capped at 25 points (except explicit requests to send a secret) | Very few false alarms from marketing or legitimate billing | Wording-only scams (giveaways, refund lures) stay *Low risk* |
 | "Inconclusive" for incomplete analysis | Never claims safety it cannot back | Some legitimate emails with RAR or encrypted attachments are *Inconclusive* |
 
 **Limitations**
@@ -345,6 +355,9 @@ A demo runbook with preflight checks and fallbacks is in [`docs/DEMO.md`](docs/D
 - Calibration data is synthetic and authored by the same person who wrote the rules; held-out sets
   reduce, but do not remove, that bias.
 - English-only wording rules; no analysis of images, QR codes, or text inside images.
+- Secret requests are missed when the secret is a bare "code" ("tell me the code Google sent you"),
+  phrased as a question ("what's the code?"), uses an unlisted verb ("answer this email with your
+  password"), or is split across sentences without a request verb next to the secret.
 - Small curated lists (15 brands, known shorteners, tracking services, security gateways); new
   ones need updates. Brand-named accounts on hosting services (`netflix.zendesk.com`) are flagged.
 - Attachment inspection is a byte search: compressed PDF streams, remote-template Office attacks,

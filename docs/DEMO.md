@@ -21,7 +21,7 @@ How to demonstrate MailGuard live, with fallbacks. Total time: about 10–15 min
 5. **What Gmail will not deliver, offline (2 min).** Gmail blocks executable attachments, and a second Gmail account cannot fail DMARC. Show these with the offline analyzer, which runs the same pipeline:
    ```bash
    cd backend
-   uv run python -m app.cli ../demo/04_malware_delivery.eml ../demo/05_sender_spoofing.eml ../demo/07_inconclusive_archive.eml
+   uv run python -m app.cli ../demo/04_malware_delivery.eml ../demo/05_sender_spoofing.eml ../demo/07_inconclusive_archive.eml ../demo/08_credential_theft_by_reply.eml
    ```
 6. **Trade-offs and limitations (3–5 min).** See section 4.
 
@@ -41,6 +41,7 @@ Change the sender name back afterwards.
 - **Why a thin add-on:** detection logic in Python is testable (500+ tests); Apps Script only reads the opened message, signs the request, validates the response and renders it.
 - **Trust model:** authentication results are *reported* by Gmail (only the topmost `Authentication-Results` header from `mx.google.com` is trusted; forged ones are ignored), never claimed as verified by MailGuard.
 - **Explainable scoring:** category budgets stop correlated evidence from stacking; attack patterns reward *independent* evidence; the card's points always add up to the score.
+- **Learning from an unseen test:** a live Gmail test exposed a real gap (an email asking for a password and verification code *by reply* scored 0). The fix detects explicit requests to send a secret, measured on three fresh held-out rounds with every problem disclosed.
 - **Honesty over confidence:** incomplete analysis is "Inconclusive", never "Safe"; wording alone can never make an email Suspicious.
 - **Anti-overfitting:** every analyzer was checked against held-out cases written before running; the scoring was calibrated on a development set and measured once on a separate held-out set.
 - **Limitations:** synthetic calibration data, English-only wording rules, no image/QR analysis, no reputation lookups or link following (deliberate: privacy and SSRF).

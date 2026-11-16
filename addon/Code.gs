@@ -217,6 +217,7 @@ var CATEGORY_LABELS = {
   attachments: 'Attachments',
   content: 'Wording',
   structure: 'Message format',
+  request: 'Request',
   pattern: 'Attack pattern',
 };
 

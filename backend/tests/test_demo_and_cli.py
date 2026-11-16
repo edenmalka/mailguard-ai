@@ -19,6 +19,7 @@ EXPECTED = {
     "05_sender_spoofing.eml": ("malicious", "sender_spoofing"),
     "06_html_attachment_phishing.eml": ("malicious", "credential_phishing"),
     "07_inconclusive_archive.eml": ("inconclusive", None),
+    "08_credential_theft_by_reply.eml": ("malicious", "credential_theft_by_reply"),
 }
 
 

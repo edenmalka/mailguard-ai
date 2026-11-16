@@ -29,6 +29,7 @@ CATEGORY_BUDGETS: dict[str, int] = {
     "attachments": 60,
     "content": 25,
     "structure": 10,
+    "request": 40,  # explicit requests to send a password or security code
 }
 
 # Groups of signal ids used by the pattern rules.
@@ -66,6 +67,21 @@ MALWARE_PAYLOAD = frozenset(
         "attachment.active_document",
         "link.dangerous_file",
         "link.script_scheme",
+    }
+)
+# Pressure or identity tricks that, together with a request to SEND a secret, indicate
+# credential theft by reply (no link needed).
+CREDENTIAL_THEFT_COMPANIONS = frozenset(
+    {
+        "content.credentials",
+        "content.urgency",
+        "sender.free_webmail",
+        "sender.reply_to_freemail",
+        "sender.reply_to_mismatch",
+        "sender.brand_impersonation",
+        "sender.lookalike_domain",
+        "sender.address_in_display_name",
+        "auth.dmarc_fail",
     }
 )
 SPOOFING_COMPANIONS = frozenset(
@@ -153,6 +169,19 @@ PATTERN_RULES: tuple[_PatternRule, ...] = (
         _two_sided(
             DECEPTIVE_LINK_OR_SENDER | {"link.form", "attachment.html_active"}, CREDENTIAL_CAPTURE
         ),
+    ),
+    _PatternRule(
+        AttackPattern(
+            id="credential_theft_by_reply",
+            name="Credential theft by reply",
+            description="The email asks you to send a password, PIN or security code back by "
+            "reply or message, with pressure or an identity trick. No link is needed: whoever "
+            "receives the reply can take over your account.",
+            advice="Do not reply with any password or code. If the request seems real, contact "
+            "the organization through its official website or a number you already know.",
+        ),
+        20,
+        _two_sided(frozenset({"request.secret_disclosure"}), CREDENTIAL_THEFT_COMPANIONS),
     ),
     _PatternRule(
         AttackPattern(
