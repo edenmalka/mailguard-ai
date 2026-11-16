@@ -9,7 +9,7 @@ How to demonstrate MailGuard live, with fallbacks. Total time: about 10–15 min
 | Backend is up and warm | `curl -s https://<your-service-url>/health` | `{"status":"ok"}` (the first call after idle may take ~3 s: Cloud Run scales to zero) |
 | Add-on runs the latest code | Apps Script → `Code.gs` matches [`addon/Code.gs`](../addon/Code.gs) | Normal emails show **"Low risk"** (not "Safe") |
 | Live demo emails are in your inbox | Section 3 | Two emails from your second account |
-| Offline fallback works | `cd backend && uv run python -m app.cli ../demo/*.eml` | Seven reports, no network needed |
+| Offline fallback works | `cd backend && uv run python -m app.cli ../demo/*.eml` | Eight reports, no network needed |
 | Nothing sensitive on screen | Close Apps Script **Project Settings** (Script Properties hold the HMAC secret), terminals with secrets, unrelated mail | — |
 
 ## 2. Demo flow

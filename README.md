@@ -70,7 +70,7 @@ flowchart LR
     end
     subgraph Google Cloud Run
       B[FastAPI: size cap → signature check → schema] --> P[Parser: hostile MIME → plain data]
-      P --> AN[Analyzers: authentication · sender · links · attachments · wording · format]
+      P --> AN[Analyzers: authentication · sender · links · attachments · wording · requests · format]
       AN --> S[Scoring: budgets · attack patterns · verdict · advice]
     end
     SM[(Secret Manager<br/>HMAC secret)] -.-> B
@@ -88,7 +88,7 @@ flowchart LR
    base64. Unauthenticated input never reaches a parser.
 4. `parse_email()` turns the untrusted bytes into a plain `ParsedEmail` object once. It never
    raises: malformed input is recorded as *defects*.
-5. Six analyzers each return **signals** (id, title, points, explanation, evidence). URLs found
+5. Seven analyzers each return **signals** (id, title, points, explanation, evidence). URLs found
    inside PDF/HTML attachments are passed to the link analyzer.
 6. The scoring engine applies category budgets, recognizes attack patterns, and produces the
    verdict, summary and advice.
@@ -386,7 +386,8 @@ backend/
     security.py           HMAC signing and verification
     parsing.py            Safe MIME parsing into ParsedEmail
     analyzers/            authentication, sender, links (+urls), attachments (+file_types),
-                          content, structure, and their reference lists
+                          content (wording), requests (secret requests), structure,
+                          and their reference lists
     scoring.py            Budgets, attack patterns, verdicts, advice
     pipeline.py           Runs analyzers and scoring for one email
     cli.py                Offline analyzer for .eml files
