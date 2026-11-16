@@ -1,7 +1,4 @@
-"""Analysis pipeline: parse once, run every analyzer, combine the evidence into a result.
-
-Scoring here is deliberately simple and provisional (sum of points, capped at 100).
-Step 7 replaces it with weighted scoring, combination rules and attack-pattern labels.
+"""Analysis pipeline: parse once, run every analyzer, then score the evidence (app/scoring.py).
 
 A low score only means "low risk" when the message was fully analyzed. If the message is
 malformed, has no usable sender, was too large to check completely, or has attachments that
@@ -15,10 +12,10 @@ from app.analyzers.links import analyze_links
 from app.analyzers.sender import analyze_sender
 from app.analyzers.structure import analyze_structure
 from app.parsing import ParsedEmail, parse_email
-from app.schemas import AnalyzeResponse, AuthSource, Signal, Verdict
+from app.schemas import AnalyzeResponse, AttackPattern, AuthSource, Signal, Verdict
+from app.scoring import MALICIOUS_THRESHOLD, SUSPICIOUS_THRESHOLD, score_signals
 
-SUSPICIOUS_THRESHOLD = 30
-MALICIOUS_THRESHOLD = 70
+__all__ = ["MALICIOUS_THRESHOLD", "SUSPICIOUS_THRESHOLD", "analyze_email"]
 
 LIMIT_NO_SENDER = "The message has no valid sender address, so the sender could not be checked."
 LIMIT_MALFORMED = (
@@ -51,7 +48,6 @@ def analyze_email(raw: bytes, trusted_authserv_ids: frozenset[str]) -> AnalyzeRe
         *analyze_content(parsed),
         *analyze_structure(parsed),
     ]
-    signals.sort(key=lambda s: s.points, reverse=True)
 
     partial_content = parsed.body_truncated or links.truncated
     limitations = _limitations(parsed, auth.summary.source, partial_content)
@@ -64,15 +60,16 @@ def analyze_email(raw: bytes, trusted_authserv_ids: frozenset[str]) -> AnalyzeRe
         and not attachments.uninspected
     )
 
-    score = min(100, sum(s.points for s in signals))
-    verdict = _verdict(score, fully_analyzed)
+    scored = score_signals(signals, fully_analyzed)
     return AnalyzeResponse(
-        score=score,
-        verdict=verdict,
-        summary=_summary(verdict, signals, limitations),
-        signals=signals,
+        score=scored.score,
+        verdict=scored.verdict,
+        summary=_summary(scored.verdict, scored.signals, scored.patterns, limitations),
+        signals=scored.signals,
         authentication=auth.summary,
         limitations=limitations,
+        attack_patterns=scored.patterns,
+        recommendation=scored.recommendation,
     )
 
 
@@ -89,16 +86,10 @@ def _limitations(parsed: ParsedEmail, auth_source: AuthSource, partial_content: 
     return limitations
 
 
-def _verdict(score: int, fully_analyzed: bool) -> Verdict:
-    if score >= MALICIOUS_THRESHOLD:
-        return Verdict.MALICIOUS
-    if score >= SUSPICIOUS_THRESHOLD:
-        return Verdict.SUSPICIOUS
-    return Verdict.SAFE if fully_analyzed else Verdict.INCONCLUSIVE
-
-
-def _summary(verdict: Verdict, signals: list[Signal], limitations: list[str]) -> str:
-    risky = [s for s in signals if s.points > 0]
+def _summary(
+    verdict: Verdict, signals: list[Signal], patterns: list[AttackPattern], limitations: list[str]
+) -> str:
+    risky = [s for s in signals if s.points > 0 and s.category != "pattern"]
     if verdict is Verdict.INCONCLUSIVE:
         return (
             "This email could not be fully analyzed, so MailGuard cannot call it low risk. "
@@ -110,4 +101,6 @@ def _summary(verdict: Verdict, signals: list[Signal], limitations: list[str]) ->
         if limitations:
             return "No risk signals found, but some checks could not be completed."
         return "No risk signals found in any of the checks."
+    if patterns:
+        return f"Looks like {patterns[0].name.lower()}: {len(risky)} risk signal(s) agree."
     return f"{len(risky)} risk signal(s) found. Most serious: {risky[0].title}."

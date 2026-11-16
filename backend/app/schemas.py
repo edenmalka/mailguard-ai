@@ -55,6 +55,15 @@ class AuthenticationSummary(BaseModel):
     dmarc: str = "unknown"
 
 
+class AttackPattern(BaseModel):
+    """A named attack recognized from a combination of independent signals."""
+
+    id: str  # e.g. "credential_phishing"
+    name: str  # e.g. "Credential phishing"
+    description: str  # what the attacker is trying to do, in plain language
+    advice: str  # what the reader should do
+
+
 class AnalyzeResponse(BaseModel):
     score: int = Field(ge=0, le=100)
     verdict: Verdict
@@ -63,6 +72,10 @@ class AnalyzeResponse(BaseModel):
     authentication: AuthenticationSummary | None = None
     # Plain-language notes on what could not be checked for this message.
     limitations: list[str] = Field(default_factory=list)
+    # Recognized attack patterns, most significant first (empty if none).
+    attack_patterns: list[AttackPattern] = Field(default_factory=list)
+    # What the reader should do, based on the verdict and the main attack pattern.
+    recommendation: str = ""
 
 
 def decode_raw_message(encoded: str) -> bytes:

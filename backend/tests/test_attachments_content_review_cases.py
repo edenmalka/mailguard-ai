@@ -53,7 +53,7 @@ MALICIOUS_ATTACHMENTS = [
             "text/html",
             b"<form action='https://x.example/'><input type=password>",
         ),
-        {"attachment.html"},
+        {"attachment.html_active"},
     ),
     (
         "SHTML with JS redirect",
@@ -62,7 +62,7 @@ MALICIOUS_ATTACHMENTS = [
             "text/html",
             b"<script>window.location.replace('https://x.example')</script>",
         ),
-        {"attachment.html"},
+        {"attachment.html_active"},
     ),
     (
         "Raw disk .img",

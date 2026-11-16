@@ -306,7 +306,7 @@ _BUILDERS = {
         "Excel. Never click 'Enable content' on documents you did not expect.",
     ),
     "html_active": _builder(
-        "html",
+        "html_active",
         "Web page attachment with active content",
         POINTS_HTML_ACTIVE,
         "An attached web page (.html/.svg) contains scripts, forms or redirects. Opened in a "

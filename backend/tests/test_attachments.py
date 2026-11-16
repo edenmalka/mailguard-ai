@@ -235,7 +235,7 @@ def test_links_inside_pdf_and_html_attachments_are_collected() -> None:
 )
 def test_active_web_page_attachments(html: bytes) -> None:
     analysis = _analyze([("receipt.html", "text/html", html)])
-    signal = next(s for s in analysis.signals if s.id == "attachment.html")
+    signal = next(s for s in analysis.signals if s.id == "attachment.html_active")
     assert signal.points == 30
 
 

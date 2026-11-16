@@ -88,6 +88,21 @@ def analyze_sender(parsed: ParsedEmail) -> list[Signal]:
     if sender.domain:
         signals.extend(_domain_signals(sender))
         signals.extend(_reply_to_signals(sender, parsed.reply_to))
+        if registrable_domain(sender.domain) in FREE_EMAIL_DOMAINS:
+            # A fact, not a risk: normal for personal mail. The scoring engine only uses it in
+            # combination (a free webmail sender asking for money is classic CEO fraud).
+            signals.append(
+                make_signal(
+                    "sender.free_webmail",
+                    CATEGORY,
+                    "Sent from a free webmail account",
+                    0,
+                    "The sender uses a free email service such as Gmail or Outlook.com. That is "
+                    "normal for personal mail, but notable when the email asks for money or "
+                    "claims to come from a company or manager.",
+                    sender.address,
+                )
+            )
     return signals
 
 
@@ -161,11 +176,16 @@ def claimed_brand(display_name: str) -> Brand | None:
         return None
     joined = skeleton("".join(words))
     for brand in BRANDS:
+        brand_keys = {skeleton(k) for k in brand.keywords}
         for keyword in brand.keywords:
             key = skeleton(keyword)
             matching = [w for w in words if skeleton(w) == key]
+            # Other words may be generic ("Support"), numbers ("365"), or the same brand's
+            # products ("Microsoft SharePoint", "Apple iCloud").
             others = [w for w in words if skeleton(w) != key]
-            if matching and all(w in GENERIC_WORDS or w.isdigit() for w in others):
+            if matching and all(
+                w in GENERIC_WORDS or w.isdigit() or skeleton(w) in brand_keys for w in others
+            ):
                 return brand
             # Multi-word brands written together or apart: "Wells Fargo" -> "wellsfargo".
             if len(key) > 6 and joined == key:

@@ -85,6 +85,9 @@ def test_legitimate_domains_are_not_lookalikes(domain: str) -> None:
         ("Office365 Admin", "Microsoft"),
         ("Wells Fargo", "Wells Fargo"),
         ("PayPaI Security", "PayPal"),  # capital I instead of l
+        ("Microsoft SharePoint", "Microsoft"),  # brand + its own product (review fix)
+        ("Apple iCloud", "Apple"),
+        ("Google Gmail Security", "Google"),
     ],
 )
 def test_brand_claims_are_recognized(name: str, brand: str) -> None:
@@ -92,7 +95,17 @@ def test_brand_claims_are_recognized(name: str, brand: str) -> None:
     assert found is not None and found.name == brand
 
 
-@pytest.mark.parametrize("name", ["Big Apple Pizza", "Jane Doe", "", "Amazonian Plants Co"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Big Apple Pizza",
+        "Jane Doe",
+        "",
+        "Amazonian Plants Co",
+        "Dropbox Fan Club",
+        "Apple Accessories Outlet",
+    ],
+)
 def test_ordinary_names_are_not_brand_claims(name: str) -> None:
     assert claimed_brand(name) is None
 
@@ -165,7 +178,12 @@ def test_reply_to_free_webmail() -> None:
 
 def test_freemail_to_freemail_is_only_a_mismatch() -> None:
     raw = make_email("From: mg-test-a@gmail.com", "Reply-To: mg-test-a@yahoo.com")
-    assert _ids(raw) == {"sender.reply_to_mismatch"}
+    assert _ids(raw) == {"sender.reply_to_mismatch", "sender.free_webmail"}  # webmail: 0-point fact
+
+
+def test_free_webmail_sender_is_a_zero_point_fact() -> None:
+    signals = analyze_sender(parse_email(make_email("From: Noa <mg-test-noa@gmail.com>")))
+    assert [(s.id, s.points) for s in signals] == [("sender.free_webmail", 0)]
 
 
 # --- evidence safety -------------------------------------------------------------------------
