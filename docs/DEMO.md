@@ -38,7 +38,7 @@ Change the sender name back afterwards.
 
 ## 4. Talking points
 
-- **Why a thin add-on:** detection logic in Python is testable (500+ tests); Apps Script only reads the opened message, signs the request, validates the response and renders it.
+- **Why a thin add-on:** detection logic in Python is testable (700+ tests); Apps Script only reads the opened message, signs the request, validates the response and renders it.
 - **Trust model:** authentication results are *reported* by Gmail (only the topmost `Authentication-Results` header from `mx.google.com` is trusted; forged ones are ignored), never claimed as verified by MailGuard.
 - **Explainable scoring:** category budgets stop correlated evidence from stacking; attack patterns reward *independent* evidence; the card's points always add up to the score.
 - **Learning from an unseen test:** a live Gmail test exposed a real gap (an email asking for a password and verification code *by reply* scored 0). The fix detects explicit requests to send a secret, measured on three fresh held-out rounds with every problem disclosed.

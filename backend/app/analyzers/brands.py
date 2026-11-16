@@ -12,14 +12,31 @@ class Brand:
     name: str  # shown to the user
     keywords: frozenset[str]  # words that identify the brand in a display name
     domains: frozenset[str]  # official registrable domains
+    # Product or service words that accompany the brand name ("Amazon Prime", "DHL Express")
+    # but do not identify the brand on their own (a gym called "Prime" is not Amazon).
+    companions: frozenset[str] = frozenset()
 
 
-def _brand(name: str, keywords: set[str], domains: set[str]) -> Brand:
-    return Brand(name, frozenset(keywords), frozenset(domains))
+def _brand(
+    name: str, keywords: set[str], domains: set[str], companions: set[str] | None = None
+) -> Brand:
+    return Brand(name, frozenset(keywords), frozenset(domains), frozenset(companions or ()))
 
+
+# Amazon's country marketplaces send order mail from their own domains (e.g. amazon.com.au).
+_AMAZON_DOMAINS = {
+    "amazon.com", "amazon.co.uk", "amazon.de", "amazon.ca", "amazon.com.au", "amazon.com.br",
+    "amazon.com.mx", "amazon.co.jp", "amazon.fr", "amazon.it", "amazon.es", "amazon.in",
+    "amazon.nl", "amazon.se", "amazon.pl", "amazon.sg", "amazon.ae", "amazon.sa",
+    "amazon.com.tr",
+}  # fmt: skip
 
 BRANDS: tuple[Brand, ...] = (
-    _brand("PayPal", {"paypal"}, {"paypal.com", "paypal.me"}),
+    _brand(
+        "PayPal",
+        {"paypal"},
+        {"paypal.com", "paypal.me", "paypal.co.uk", "paypal.de", "paypal.com.au"},
+    ),
     _brand(
         "Microsoft",
         {"microsoft", "office365", "outlook", "onedrive", "sharepoint"},
@@ -29,17 +46,18 @@ BRANDS: tuple[Brand, ...] = (
     _brand(
         "Google", {"google", "gmail"}, {"google.com", "gmail.com", "googlemail.com", "youtube.com"}
     ),
-    _brand("Amazon", {"amazon"}, {"amazon.com", "amazon.co.uk", "amazon.de"}),
+    _brand("Amazon", {"amazon"}, _AMAZON_DOMAINS, {"prime"}),
     _brand("Netflix", {"netflix"}, {"netflix.com"}),
-    _brand("DHL", {"dhl"}, {"dhl.com", "dhl.de"}),
-    _brand("FedEx", {"fedex"}, {"fedex.com"}),
+    # Not "parcel": DHL Parcel mails from its own domains (e.g. dhlparcel.co.uk).
+    _brand("DHL", {"dhl"}, {"dhl.com", "dhl.de"}, {"express"}),
+    _brand("FedEx", {"fedex"}, {"fedex.com"}, {"express", "ground", "delivery"}),
     _brand("DocuSign", {"docusign"}, {"docusign.com", "docusign.net"}),
     _brand("LinkedIn", {"linkedin"}, {"linkedin.com"}),
     _brand("Facebook", {"facebook", "meta"}, {"facebook.com", "facebookmail.com", "meta.com"}),
-    _brand("Instagram", {"instagram"}, {"instagram.com", "mail.instagram.com"}),
+    _brand("Instagram", {"instagram"}, {"instagram.com"}),
     _brand("Dropbox", {"dropbox"}, {"dropbox.com", "dropboxmail.com"}),
     _brand("Coinbase", {"coinbase"}, {"coinbase.com"}),
-    _brand("Wells Fargo", {"wellsfargo"}, {"wellsfargo.com"}),
+    _brand("Wells Fargo", {"wellsfargo"}, {"wellsfargo.com"}, {"bank", "banking"}),
 )
 
 # Words that commonly accompany a brand in phishing display names and domains

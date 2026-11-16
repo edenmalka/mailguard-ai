@@ -6,7 +6,12 @@ file are what the operating system actually acts on. Comparing them reveals disg
 
 from __future__ import annotations
 
+import re
+
 from app.analyzers.link_data import DANGEROUS_EXTENSIONS
+
+# An <svg> or <html> element (optionally namespace-prefixed, e.g. <svg:svg>), not <htmlFoo>.
+_SVG_OR_HTML_ROOT = re.compile(rb"<(?:[a-z0-9_.-]+:)?(?:svg|html)[\s/>]")
 
 # Files that run code, or containers/shortcuts that lead to code, when opened on Windows/macOS.
 EXECUTABLE_EXTENSIONS: frozenset[str] = DANGEROUS_EXTENSIONS | frozenset(
@@ -87,7 +92,11 @@ def sniff(data: bytes) -> str | None:
 
 def _looks_like_html(data: bytes) -> bool:
     start = data[:512].lstrip(b"\xef\xbb\xbf \t\r\n").lower()
-    return start.startswith((b"<!doctype html", b"<html", b"<script", b"<svg", b"<?xml"))
+    if start.startswith(b"<?xml"):
+        # XML is a web page only if it is SVG or XHTML; plain XML (e.g. an e-invoice) is data.
+        # The prolog can be followed by long comments or a DOCTYPE, so look a little further.
+        return _SVG_OR_HTML_ROOT.search(data[:4096].lower()) is not None
+    return start.startswith((b"<!doctype html", b"<html", b"<script", b"<svg"))
 
 
 # Real types that run code no matter what the name says.

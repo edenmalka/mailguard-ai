@@ -9,13 +9,20 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, unquote
 
 from app.analyzers.common import make_signal
-from app.analyzers.domains import Lookalike, find_lookalike, registrable_domain, same_organization
+from app.analyzers.domains import (
+    Lookalike,
+    find_lookalike,
+    official_brand_for,
+    registrable_domain,
+    same_organization,
+)
 from app.analyzers.link_data import (
     DANGEROUS_EXTENSIONS,
     OPAQUE_REWRITER_DOMAINS,
+    REDIRECT_PATHS,
     REWRITER_HOSTS,
     RISKY_TLDS,
     SCRIPT_SCHEMES,
@@ -89,25 +96,50 @@ def analyze_links(parsed: ParsedEmail, extra_urls: Sequence[str] = ()) -> LinkAn
     return LinkAnalysis(signals, len(extraction.links), extraction.truncated)
 
 
-def _is_rewriter(host: str) -> bool:
-    return any(host == h or host.endswith("." + h) for h in REWRITER_HOSTS)
+def _wrapped_destination(link: Link) -> Link | None:
+    """Where a security-gateway or redirector link really sends the user; None otherwise.
+
+    The destination is read from the parameter the gateway actually follows, so a decoy URL
+    added elsewhere in the link ("...&x=https://www.paypal.com") is not mistaken for it.
+    """
+    host = link.host
+    redirect = REDIRECT_PATHS.get(host)
+    if redirect is not None and redirect[0] == link.path:
+        params = redirect[1]
+    else:
+        gateway = next((h for h in REWRITER_HOSTS if host == h or host.endswith("." + h)), None)
+        if gateway is None:
+            return None
+        params = REWRITER_HOSTS[gateway]
+
+    if params:
+        values = [value for key, value in parse_qsl(link.query) if key in params]
+        target = unquote(values[0]) if values else ""  # some gateways encode it twice
+    else:
+        inner_urls = embedded_urls(link.url)
+        target = inner_urls[0] if inner_urls else ""
+    inner = parse_link(target, None, "embedded") if target else None
+    return inner if inner is not None and inner.host else None
+
+
+def _same_brand(domain_a: str, domain_b: str) -> bool:
+    """Both are official domains of one brand, e.g. outlook.com and live.com (Microsoft)."""
+    brand = official_brand_for(domain_a)
+    return brand is not None and brand is official_brand_for(domain_b)
 
 
 def _text_matches_destination(text_domain: str, link: Link) -> bool:
     """True if the domain shown in the link text is where the link (effectively) goes."""
-    if same_organization(text_domain, link.host):
+    if same_organization(text_domain, link.host) or _same_brand(text_domain, link.host):
         return True
     registered = registrable_domain(link.host)
     if registered in TRACKING_DOMAINS or registered in OPAQUE_REWRITER_DOMAINS:
         return True  # legitimate click tracking / opaque security gateway
-    if _is_rewriter(link.host):
-        # Safe Links, URL Defense, google.com/url: compare with the wrapped destination.
-        return any(
-            same_organization(text_domain, inner.host)
-            for inner in (parse_link(u, None, "embedded") for u in embedded_urls(link.url))
-            if inner is not None
-        )
-    return False
+    # Safe Links, URL Defense, google.com/url: compare with the wrapped destination.
+    inner = _wrapped_destination(link)
+    return inner is not None and (
+        same_organization(text_domain, inner.host) or _same_brand(text_domain, inner.host)
+    )
 
 
 def _check_web_link(

@@ -17,7 +17,8 @@ TRACKING_DOMAINS: frozenset[str] = frozenset(
         "mandrillapp.com", "hubspotlinks.com", "hubspot.com", "exct.net", "rs6.net",
         "createsend.com", "cmail19.com", "cmail20.com", "awstrack.me", "klclick.com",
         "klaviyo.com", "sparkpostmail.com", "spmailtechn.com", "substack.com", "mlsend.com",
-        "convertkit-mail.com", "beehiiv.com",
+        "convertkit-mail.com", "beehiiv.com", "pardot.com", "iterable.com", "eloqua.com",
+        "customeriomail.com", "pstmrk.it", "mjt.lu",
     }
 )  # fmt: skip
 
@@ -45,15 +46,22 @@ SCRIPT_SCHEMES: frozenset[str] = frozenset(
     {"javascript", "vbscript", "data", "file", "ms-msdt", "search-ms", "search", "ms-officecmd"}
 )
 
-# Security gateways and redirectors that wrap the real destination inside their own link.
-# For these, the wrapped destination is what the user effectively visits.
-REWRITER_HOSTS: tuple[str, ...] = (
-    "safelinks.protection.outlook.com",  # Microsoft Defender Safe Links
-    "urldefense.com",  # Proofpoint URL Defense (v3)
-    "urldefense.proofpoint.com",  # Proofpoint URL Defense (v2)
-    "linkprotect.cudasvc.com",  # Barracuda Link Protection
-    "google.com",  # google.com/url?q=... redirects
-)
+# Security gateways that wrap the real destination inside their own link; the wrapped
+# destination is what the user effectively visits. Host -> the query parameter(s) holding the
+# destination, or () when it is written in the path (Proofpoint v3: /v3/__https://dest__;...).
+REWRITER_HOSTS: dict[str, tuple[str, ...]] = {
+    "safelinks.protection.outlook.com": ("url",),  # Microsoft Defender Safe Links
+    "urldefense.com": (),  # Proofpoint URL Defense (v3)
+    "urldefense.proofpoint.com": ("u",),  # Proofpoint URL Defense (v2, encoded: not decoded)
+    "linkprotect.cudasvc.com": ("a",),  # Barracuda Link Protection
+}
+# Redirectors at one path only. Other pages on these hosts can be made by anyone (Google Sites,
+# Google Forms), so a URL inside THOSE links is not where the click goes.
+# Host -> (path, destination query parameters).
+REDIRECT_PATHS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "google.com": ("/url", ("q", "url")),
+    "www.google.com": ("/url", ("q", "url")),
+}
 
 # Gateways whose links are opaque (destination not visible): exempt from text/link mismatch.
 OPAQUE_REWRITER_DOMAINS: frozenset[str] = frozenset({"mimecast.com"})

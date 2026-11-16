@@ -95,7 +95,7 @@ flowchart LR
 7. The add-on **validates every field** of the response, HTML-escapes all text, and renders the card.
 
 **Why this split.** The add-on is a thin client (≈380 lines): Apps Script is hard to test and
-version, while the Python backend carries all detection logic behind 500+ automated tests. The
+version, while the Python backend carries all detection logic behind 700+ automated tests. The
 backend is stateless, so it scales to zero when idle.
 
 | Component | Key files |
@@ -117,7 +117,7 @@ list with plain-language explanations is in the code and shown on the card.
 | Category (budget) | Signals (points) |
 |---|---|
 | **Authentication** (40) | DMARC fail (35) · SPF fail (15) / softfail (8) · DKIM fail (15) · no DMARC policy (5). Ignored when DMARC passes, because forwarding breaks SPF innocently. |
-| **Sender** (50) | Display name claims a brand from another domain or from free webmail (30) · look-alike domain: homoglyph `paypa1`, typo `paypall`, extra words `paypal-secure`, brand as subdomain `paypal.evil.example` (30) · replies go to free webmail (25) / another organization (15) · address hidden in display name (25) · multiple From (20) · punycode domain (15) · hidden bidi/zero-width characters (15) · no valid sender (10) |
+| **Sender** (50) | Display name claims a brand from another domain or from free webmail, including forms like `Amazon.com`, `DHL Express`, `Pay Pal` (30) · look-alike domain: homoglyph `paypa1`, typo `paypall`, extra words `paypal-secure` / `paypalcom`, brand as subdomain `paypal.evil.example`, the exact brand name on an abused ending such as `.top` (30) · replies go to free webmail (25) / another organization (15) · address hidden in display name (25) · multiple From (20) · punycode domain (15) · hidden bidi/zero-width characters (15) · no valid sender (10) |
 | **Links** (50) | Text shows a different domain than the link (30) · look-alike domain (30) · `user@host` disguise (25) · program download (25) · form inside the email (25) · bare or obfuscated IP such as `http://3232235777` (20) · `javascript:`, `data:`, `file:`, `ms-msdt:` schemes (20) · shortener (10) · punycode (10) · abused TLD such as `.top` or `.zip` (10) |
 | **Attachments** (60) | Program, script, shortcut or disk image (40) · disguised: `invoice.pdf.exe`, RTLO name, "PDF" that is really a program (35) · archive containing a program (35) · Office macros (30) · HTML/SVG with scripts or forms (30) / plain (15) · PDF with JavaScript or an embedded program, RTF with objects (25) · password-protected archive (20, or 30 if the password is in the email) |
 | **Requests** (40) | Asks you to **send** a password, PIN, one-time or verification code, recovery codes, security answers, card number or CVV, or SSN by reply or message (40). Ignored when negated ("we will never ask you to send…"), for shared codes (meeting or Wi-Fi passcodes), and when the secret belongs to another clause ("tell your manager if anyone asks for your password"). |
@@ -126,7 +126,8 @@ list with plain-language explanations is in the code and shown on the card.
 
 **Normalization before judging.** Links are normalized the way browsers interpret them
 (`https:\\evil`, `http:/host`, entity- and percent-encoding, `user@host`, nested redirect targets
-inside Outlook Safe Links, Proofpoint and `google.com/url`). Wording is normalized against evasion
+inside Outlook Safe Links, Proofpoint, Barracuda and `google.com/url`, read from the parameter the
+gateway actually follows, so a decoy URL appended elsewhere does not count). Wording is normalized against evasion
 (zero-width characters, full-width letters, `v e r i f y`). Attachments are identified by their
 **first bytes**, not by the name or Content-Type the sender chose.
 
@@ -169,7 +170,7 @@ MailGuard would perform itself).
 
 | Threat | Mitigation |
 |---|---|
-| **Hostile email content** (the attacker controls every byte) | Analysis runs in a worker thread, so one slow email cannot stall other requests. Parse once with the stdlib, never raise; bounded work everywhere (2 MB message, 1 M characters per body, 200 MIME parts, 500 links, address headers cut *before* parsing after an email with 50,000 addresses was found to take 36 s); worst cases measured under 3 s. Attachments are never opened, executed or extracted: ZIPs are inspected via their file list only (zip-bomb safe). |
+| **Hostile email content** (the attacker controls every byte) | Analysis runs in a worker thread, so one slow email cannot stall other requests. Parse once with the stdlib, never raise; bounded work everywhere (2 MB message, 1 M characters per body, 1,000 headers, 200 MIME parts, 500 links, address headers cut *before* parsing after an email with 50,000 addresses was found to take 36 s). An independent review later found two more slow inputs, 500 links with 2,000-character host names (35 s) and 100,000-header floods (9 s); both were fixed, and every known worst case now runs in under 1.5 s on a laptop (tested with a 3 s limit). Attachments are never opened, executed or extracted: ZIPs are inspected via their file list only (zip-bomb safe). |
 | **Hostile email trying to attack the reader through the card** | All text from the email is cleaned (invisible characters shown as `[U+202E]`, length capped) and HTML-escaped; links are defanged (`hxxps://evil[.]example`), so nothing on the card is clickable. |
 | **Forged authentication results** | Only the topmost header from `mx.google.com` is trusted (tested with forged headers above and below). |
 | **Server-side request forgery, tracking pings** | The backend makes **no network calls** while analyzing (tested with sockets blocked). Links are never visited; the public-suffix list is a bundled offline snapshot. |
@@ -191,7 +192,7 @@ MailGuard would perform itself).
 
 ## 5. Testing and evaluation
 
-**637 tests** (plus 6 documented expected failures) run in about 5 seconds:
+**713 tests** (plus 6 documented expected failures) run in about 10 seconds:
 `cd backend && uv run pytest`.
 
 | Area | What is covered |
@@ -217,6 +218,14 @@ alarm class; 8/8 with 2/8, one being a negation bug with contractions). Each pro
 a general rule and disclosed in the test files; two accepted misses are kept as expected failures.
 All 230+ review and calibration cases are kept as regression tests.
 
+**Independent audit.** A final read-only security review then probed the finished system with
+adversarial inputs and fuzzing (6,000 mutated emails: no crashes). It found one bypass (a ZIP
+containing a decoy `[Content_Types].xml` was treated as an Office file, which hid a program
+inside), the two slow inputs above, decoy URLs that hid a link mismatch on Google-hosted pages,
+missed brand display names (`Amazon.com`, `DHL Express`), and false alarms on a brand's own
+country domains (`amazon.com.au`). Every finding has a test in
+[`tests/test_audit_fixes.py`](backend/tests/test_audit_fixes.py) that failed before its fix.
+
 **Calibration.** The scoring engine was tuned on a development set of 30 labeled emails, then
 measured **once** on a separate held-out set of 30 written before it was run:
 
@@ -224,6 +233,9 @@ measured **once** on a separate held-out set of 30 written before it was run:
 |---|---|---|---|
 | Development (tuned on) | 29 / 30 | 0 / 15 | 1 (QR code in an image) |
 | Held-out (run once) | 27 / 30 → 28 / 30 after a bug fix | 0 / 15 | 2 wording-only scams, kept below Suspicious by design |
+
+Both sets were re-run after the audit fixes: results unchanged (one development phishing email
+gained a brand-impersonation signal it had missed).
 
 All calibration emails are synthetic and written by the author, which is the main caveat (see §8).
 
@@ -360,6 +372,11 @@ A demo runbook with preflight checks and fallbacks is in [`docs/DEMO.md`](docs/D
   password"), or is split across sentences without a request verb next to the secret.
 - Small curated lists (15 brands, known shorteners, tracking services, security gateways); new
   ones need updates. Brand-named accounts on hosting services (`netflix.zendesk.com`) are flagged.
+  Country domains are listed for Amazon and PayPal only, so, for example, mail from a DHL
+  country domain with "DHL" in the sender name is flagged. The exact brand name on another
+  ordinary ending (such as `.co`) is not treated as a look-alike, because brands own many of these.
+- Text/link mismatches through a listed email-marketing tracker are not flagged (the real
+  destination is hidden by design); an attacker sending through such a service gains that too.
 - Attachment inspection is a byte search: compressed PDF streams, remote-template Office attacks,
   Excel 4.0 macros, and RAR/7z/nested archives are not inspected (the last are reported as limits).
 - Legitimate-but-unusual email can reach *Suspicious*: a business replying from Gmail, a mailing

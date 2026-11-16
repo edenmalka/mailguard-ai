@@ -41,6 +41,10 @@ POINTS_REPLY_TO_FREEMAIL = 25
 
 _EMAIL_IN_TEXT = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 _WORD = re.compile(r"[^\W_]+")
+# A domain ending written right after a word, e.g. ".com" in "amazon.com", ".co.uk".
+_DOMAIN_ENDING = re.compile(r"(?<=[^\W_])\.[a-z]{2,3}(?:\.[a-z]{2})?(?![\w.])")
+# Brands this long are recognized even when split ("Pay Pal") or spelled out ("P a y P a l").
+_MIN_SPLIT_BRAND_LENGTH = 6
 # Bidirectional overrides/isolates and zero-width characters: used to disguise text.
 _HIDDEN_CHARS = frozenset(
     chr(cp)
@@ -166,31 +170,47 @@ def _display_name_signals(sender: EmailAddress) -> list[Signal]:
 def claimed_brand(display_name: str) -> Brand | None:
     """Return a brand if the display name presents itself as that brand.
 
-    "PayPal", "PayPal Support", "Microsoft account team" -> brand.
+    "PayPal", "PayPal Support", "Microsoft account team", "Amazon.com", "DHL Express",
+    "Wells Fargo Online", "Pay Pal" -> brand.
     "Big Apple Pizza" -> None (other words make it a different business).
     """
     normalized = unicodedata.normalize("NFKC", display_name).casefold()
     normalized = "".join(ch for ch in normalized if ch not in _HIDDEN_CHARS)
+    # "Amazon.com", "amazon.co.uk": a domain ending attached to the name is part of the claim.
+    normalized = _DOMAIN_ENDING.sub("", normalized)
     words = _WORD.findall(normalized)
     if not words or len(words) > 6:
         return None
     joined = skeleton("".join(words))
     for brand in BRANDS:
         brand_keys = {skeleton(k) for k in brand.keywords}
-        for keyword in brand.keywords:
-            key = skeleton(keyword)
-            matching = [w for w in words if skeleton(w) == key]
-            # Other words may be generic ("Support"), numbers ("365"), or the same brand's
-            # products ("Microsoft SharePoint", "Apple iCloud").
-            others = [w for w in words if skeleton(w) != key]
-            if matching and all(
-                w in GENERIC_WORDS or w.isdigit() or skeleton(w) in brand_keys for w in others
-            ):
-                return brand
-            # Multi-word brands written together or apart: "Wells Fargo" -> "wellsfargo".
-            if len(key) > 6 and joined == key:
+        allowed = GENERIC_WORDS | brand.companions
+        for key in brand_keys:
+            # The name as written, and with a brand split in two joined up ("Wells Fargo
+            # Online" -> "wellsfargo online", "Pay Pal" -> "paypal").
+            for tokens in (words, _join_split_brand(words, key)):
+                matching = [w for w in tokens if skeleton(w) == key]
+                # Other words may be generic ("Support"), numbers ("365"), the brand's products
+                # ("Microsoft SharePoint", "Amazon Prime") or its other names ("Apple iCloud").
+                others = [w for w in tokens if skeleton(w) != key]
+                if matching and all(
+                    w in allowed or w.isdigit() or skeleton(w) in brand_keys for w in others
+                ):
+                    return brand
+            # A brand spelled out letter by letter: "P a y P a l".
+            if len(key) >= _MIN_SPLIT_BRAND_LENGTH and joined == key:
                 return brand
     return None
+
+
+def _join_split_brand(words: list[str], key: str) -> list[str]:
+    """Join the first pair of adjacent words that together spell `key` (a brand skeleton)."""
+    if len(key) < _MIN_SPLIT_BRAND_LENGTH:
+        return words  # short brands ("dhl", "meta") arise too easily from ordinary words
+    for i in range(len(words) - 1):
+        if skeleton(words[i] + words[i + 1]) == key:
+            return [*words[:i], words[i] + words[i + 1], *words[i + 2 :]]
+    return words
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +226,7 @@ def _domain_signals(sender: EmailAddress) -> list[Signal]:
             "typo": "is a near-misspelling",
             "combo": "adds extra words to the brand name",
             "subdomain": "hides the real domain name at the start of a different domain",
+            "tld": "puts the brand name on a frequently abused ending instead",
         }
         return [
             make_signal(

@@ -108,19 +108,30 @@ def test_each_category_fires_once_with_example_phrases() -> None:
 
 
 def test_wording_alone_never_reaches_suspicious() -> None:
-    """Every category at once still adds at most 25 points (Suspicious starts at 30)."""
-    from app.analyzers.content import MAX_CONTENT_POINTS
-    from app.pipeline import SUSPICIOUS_THRESHOLD
+    """Every category at once still adds at most 25 points (Suspicious starts at 30).
+
+    The cap is applied once, by the scoring engine's "content" budget. (The analyzer used to
+    apply its own copy of it, which hid budget-exceeding phrases from attack-pattern rules.)
+    """
+    from app.pipeline import SUSPICIOUS_THRESHOLD, analyze_email
+    from app.scoring import CATEGORY_BUDGETS
 
     body = (
         "Dear customer, urgent: verify your account. Wire transfer needed. "
         "Keep this confidential. You have won a prize."
     )
-    raw = f"From: a@example.com\r\nSubject: Hi\r\n\r\n{body}".encode()
-    signals = analyze_content(parse_email(raw))
-    assert len(signals) == 6  # every category is still reported
-    assert sum(s.points for s in signals) == MAX_CONTENT_POINTS < SUSPICIOUS_THRESHOLD
-    assert [s.points for s in signals][-1] == 0  # past the budget: shown as "Info"
+    raw = (
+        "Authentication-Results: mx.google.com; spf=pass; dkim=pass; dmarc=pass\r\n"
+        f"From: a@example.com\r\nSubject: Hi\r\n\r\n{body}"
+    ).encode()
+    assert len(analyze_content(parse_email(raw))) == 6  # every category is still reported
+
+    result = analyze_email(raw, frozenset({"mx.google.com"}))
+    content = [s for s in result.signals if s.category == "content"]
+    assert len(content) == 6
+    assert sum(s.points for s in content) == CATEGORY_BUDGETS["content"] == 25
+    assert result.score == 25 < SUSPICIOUS_THRESHOLD and result.verdict == "safe"
+    assert min(s.points for s in content) == 0  # past the budget: shown as "Info"
 
 
 def test_legitimate_dunning_email_stays_low_risk() -> None:

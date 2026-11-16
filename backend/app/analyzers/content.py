@@ -24,8 +24,9 @@ from app.schemas import Signal
 CATEGORY = "content"
 MAX_SCAN_CHARS = 200_000  # social-engineering language appears near the top of a message
 MAX_EXAMPLES = 3
-# Wording alone can never make an email Suspicious (threshold 30): it is corroborating evidence.
-MAX_CONTENT_POINTS = 25
+# Wording alone can never make an email Suspicious: the scoring engine caps this category at
+# 25 points (CATEGORY_BUDGETS in app/scoring.py), below the Suspicious threshold of 30. Each
+# rule reports its full points here, so attack-pattern rules see every phrase that was found.
 _SPELLING_VARIANTS = (("e-mail", "email"), ("mail box", "mailbox"), ("log-in", "login"))
 _SPACED_LETTERS = re.compile(r"\b(?:\w ){3,}\w\b")
 NEGATION_WINDOW = 40  # characters before a match checked for "never", "not", ...
@@ -165,8 +166,7 @@ def message_text(parsed: ParsedEmail) -> str:
 def analyze_content(parsed: ParsedEmail) -> list[Signal]:
     text = message_text(parsed)
     signals = []
-    budget = MAX_CONTENT_POINTS  # rules are ordered by importance and share this budget
-    for rule in _RULES:
+    for rule in _RULES:  # ordered by importance, which is also the order the budget is spent
         matches = list(
             dict.fromkeys(
                 m.group(0) for m in rule.pattern.finditer(text) if not _negated(text, m.start())
@@ -174,14 +174,12 @@ def analyze_content(parsed: ParsedEmail) -> list[Signal]:
         )
         if matches:
             shown = ", ".join(f'"{m}"' for m in matches[:MAX_EXAMPLES])
-            points = min(rule.points, budget)  # 0 once the budget is used up: shown as "Info"
-            budget -= points
             signals.append(
                 make_signal(
                     f"content.{rule.id}",
                     CATEGORY,
                     rule.title,
-                    points,
+                    rule.points,
                     rule.explanation,
                     f"Phrases found: {shown}",
                 )

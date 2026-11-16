@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import tldextract
 
 from app.analyzers.brands import BRANDS, GENERIC_WORDS, Brand
+from app.analyzers.link_data import RISKY_TLDS
 
 # suffix_list_urls=() -> never download; use the bundled public-suffix snapshot.
 _extractor = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
@@ -23,6 +24,8 @@ _CONFUSABLE_SEQUENCES = (("rn", "m"), ("vv", "w"), ("cl", "d"))
 # domains (offices.com, live-music.com), so only look-alike characters are checked for them.
 _DICTIONARY_LABELS = frozenset({"office", "live", "meta", "outlook"})
 _MIN_TYPO_LABEL_LENGTH = 6
+# Domain endings written as part of the name: "paypalcom" reads as "paypal.com".
+_TLD_WORDS = frozenset({"com", "net", "org"})
 
 _CONFUSABLE_CHARS = str.maketrans(
     {"0": "o", "1": "l", "i": "l", "|": "l", "3": "e", "5": "s", "$": "s", "@": "a", "4": "a"}
@@ -133,13 +136,17 @@ def find_lookalike(domain: str) -> Lookalike | None:
     prefix = domain[: -len(registered)].rstrip(".") if domain.endswith("." + registered) else ""
     prefix_parts = {skeleton(p) for lbl in prefix.split(".") if lbl for p in lbl.split("-")}
 
+    tld = domain.rsplit(".", 1)[-1]
+
     for brand in BRANDS:
         for official in sorted(brand.domains):
             official_label = registrable_label(official)
 
             # paypal.com.account-verify.example, mail.dhl.com.track.test: a brand domain used as
             # subdomain labels of an unrelated domain, so the start of the name looks official.
-            if f".{official}." in f".{domain}":
+            # Only the labels BEFORE the registrable domain count: in email.amazon.com.au the
+            # "amazon.com" is part of the registrable domain itself, not a disguise.
+            if prefix and f".{official}." in f".{prefix}.":
                 return Lookalike(brand, official, "subdomain")
             # paypal.account-verify.example, paypal.com-login.example: brand name as a
             # subdomain label in front of an unrelated registrable domain.
@@ -155,10 +162,19 @@ def find_lookalike(domain: str) -> Lookalike | None:
             if official_label in _DICTIONARY_LABELS:
                 continue
 
+            # "paypal" + ".top": the exact brand name on a cheap, frequently abused ending.
+            # Brands do not run their mail or sign-in pages there. (Other endings, such as
+            # amazon.ca, are often the brand's own country sites, so they are not flagged.)
+            if label == official_label and tld in RISKY_TLDS:
+                return Lookalike(brand, official, "tld")
+
             # paypall.example, micosoft.example: one or two typing mistakes away.
             max_distance = 2 if len(official_label) >= 9 else 1
             if (
                 len(official_label) >= _MIN_TYPO_LABEL_LENGTH
+                # Edit distance is at least the length difference. Checking that first is exact
+                # and keeps very long (attacker-made) host names from costing seconds each.
+                and abs(len(label) - len(official_label)) <= max_distance
                 and 0 < levenshtein(label, official_label) <= max_distance
             ):
                 return Lookalike(brand, official, "typo")
@@ -169,6 +185,8 @@ def find_lookalike(domain: str) -> Lookalike | None:
             parts = label.split("-")
             if len(parts) > 1 and official_skeleton in {skeleton(p) for p in parts}:
                 return Lookalike(brand, official, "combo")
-            if label.startswith(official_label) and label[len(official_label) :] in GENERIC_WORDS:
+            # paypalsupport.example, paypalcom.example ("paypal.com" without the dot).
+            rest = label[len(official_label) :]
+            if label.startswith(official_label) and (rest in GENERIC_WORDS or rest in _TLD_WORDS):
                 return Lookalike(brand, official, "combo")
     return None

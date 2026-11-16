@@ -22,6 +22,10 @@ from app.analyzers.domains import normalize_domain
 MAX_PARTS = 200
 MAX_TEXT_CHARS = 1_000_000  # per body type; raw messages are capped at 2 MB anyway
 MAX_HEADER_CHARS = 10_000
+# Real messages have tens of headers (a few hundred at most, after many relays). Decoding is the
+# costly part, and 100,000 tiny headers took up to 9 s, so only the first ones are read and the
+# message is marked malformed (which makes a low score "inconclusive", never "safe").
+MAX_HEADERS = 1_000
 # Python's address parser slows down sharply on huge address lists (seconds for tens of
 # thousands of addresses), which an attacker could use to make analysis time out. Real
 # address headers are far shorter, so longer ones are cut at an address boundary first.
@@ -89,7 +93,10 @@ def parse_email(raw: bytes) -> ParsedEmail:
 
 
 def _read_headers(message: EmailMessage, parsed: ParsedEmail) -> None:
-    for name, raw_value in message.raw_items():
+    for index, (name, raw_value) in enumerate(message.raw_items()):
+        if index >= MAX_HEADERS:
+            parsed.defects.append("TooManyHeaders")
+            break
         raw_value = _restore_utf8(raw_value)
         lname = name.lower()
         raw_value = _limit_header(lname, raw_value, parsed)
@@ -190,6 +197,9 @@ def _read_parts(message: EmailMessage, parsed: ParsedEmail) -> None:
             if index >= MAX_PARTS:
                 parsed.defects.append("TooManyParts")
                 break
+            # Structure problems are recorded on the part where they occur (e.g. an unclosed
+            # inner multipart), not only on the message itself.
+            parsed.defects.extend(type(d).__name__ for d in part.defects)
             if part.is_multipart():
                 continue
             _read_leaf_part(part, parsed, text_parts, html_parts)

@@ -37,7 +37,11 @@ CATEGORY = "attachments"
 MAX_ATTACHMENTS = 50
 MAX_ZIP_ENTRIES = 1000
 MAX_URLS_PER_FILE = 50
-MAX_SCAN_BYTES = 1_000_000
+# Content checks read at most this much of each file. It equals the default message size limit,
+# so with default settings every attachment is checked completely. Larger files (possible only
+# if the limit is raised) are reported as not fully inspected instead of being cut silently,
+# because an attacker could put the dangerous part after the scanned window.
+MAX_SCAN_BYTES = 2 * 1024 * 1024
 MAX_EXAMPLES = 3
 
 POINTS_EXECUTABLE = 40
@@ -113,6 +117,9 @@ def _inspect(attachment: Attachment, findings: _Findings) -> None:
     ext = exts[-1] if exts else ""
     data = attachment.data
     kind = sniff(data)
+    if len(data) > MAX_SCAN_BYTES:
+        limit_mb = MAX_SCAN_BYTES // (1024 * 1024)
+        findings.uninspected.append(f"{name} (only the first {limit_mb} MB checked)")
 
     # Disguises: hidden characters, double extensions, and names that lie about the content.
     if attachment.filename and any(unicodedata.category(ch) == "Cf" for ch in attachment.filename):
@@ -135,7 +142,7 @@ def _inspect(attachment: Attachment, findings: _Findings) -> None:
     if ext in MACRO_EXTENSIONS:
         findings.note("macro", f"{name} (macro-enabled Office format)")
     elif kind == "ole" and (ext in OLE_OFFICE_EXTENSIONS or not ext):
-        if _OLE_MACRO_MARKER in data[: MAX_SCAN_BYTES * 2]:
+        if _OLE_MACRO_MARKER in data[:MAX_SCAN_BYTES]:
             findings.note("macro", f"{name} (contains a VBA macro project)")
 
     if kind == "pdf":
@@ -159,11 +166,11 @@ def _inspect_zip(name: str, ext: str, data: bytes, findings: _Findings) -> None:
     if len(entries) > MAX_ZIP_ENTRIES:
         findings.uninspected.append(f"{name} (more than {MAX_ZIP_ENTRIES} files inside)")
 
+    # Office files (.docx, .xlsm, ...) are ZIPs too. The marker file only ADDS the macro check:
+    # anyone can put a "[Content_Types].xml" into a ZIP, so every other check below still runs.
     is_office = "[Content_Types].xml" in names
-    if is_office:
-        if any(n.lower().endswith("vbaproject.bin") for n in names):
-            findings.note("macro", f"{name} (contains a VBA macro project)")
-        return
+    if is_office and any(n.lower().endswith("vbaproject.bin") for n in names):
+        findings.note("macro", f"{name} (contains a VBA macro project)")
 
     if any(entry.flag_bits & 0x1 for entry in entries):
         findings.note("encrypted", name)
